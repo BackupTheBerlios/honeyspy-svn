@@ -1,2 +1,3 @@
 V	061023191655Z		01	unknown	/C=pl/ST=Some-State/O=Serwer Centralny HoneySpy/CN=main
 V	061023191847Z		02	unknown	/C=pl/ST=Some-State/O=Sensor HoneySpy/CN=sensor1
+V	061023202514Z		03	unknown	/C=PL/O=HoneySpy network/OU=Sensor/CN=sensor1

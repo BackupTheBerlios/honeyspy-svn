@@ -29,9 +29,9 @@ if(!($sock = IO::Socket::SSL->new( Listen => 5,
 				   Proto     => 'tcp',
 				   Reuse     => 1,
 
-					SSL_key_file => '../certs/server-key.pem',
-					SSL_cert_file => '../certs/server-cert.pem',
-					SSL_ca_file => '../certs/server-cert.pem',
+					SSL_key_file => '../certs/master-key.pem',
+					SSL_cert_file => '../certs/master-cert.pem',
+					SSL_ca_file => '../certs/master-cert.pem',
 
 				   SSL_verify_mode => 0x01,
 				   SSL_passwd_cb => sub {return "bluebell"},

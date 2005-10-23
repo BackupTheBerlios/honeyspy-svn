@@ -29,30 +29,30 @@ jest potrzebny klucz i certyfika urzêdu certyfikacyjnego
 na serwerze:
 	Utworzyc klucz prywatny:
 
-	openssl genrsa -des3 -out server-key.enc 1024
+	openssl genrsa -des3 -out master-key.enc 1024
 	passphrase: test
 
 	Usuniecie frazy kodujacej:
-	openssl rsa -in server-key.enc -out server-key.pem
+	openssl rsa -in master-key.enc -out master-key.pem
+
+	Utworzyc certyfikat dla tego klucza podpisany nim samym:
+	openssl req -new -x509 -days 365 -key master-key.pem -out master-cert.pem
 
 	
+/*
 	utworzyc pro¶bê o podpisanie certyfikatu
-		openssl req -new -key server-key.pem -out server.csr
+		openssl req -new -key master-key.pem -out server.csr
 
 	wystawic certyfikat serwerowi za pomoca certyfikatu urzedu certifykacyjnego
 		openssl ca -policy policy_anything -keyfile ca-key.pem \
-			-cert ca-cert.pem -in server.csr -out server-cert.pem
-
-/*
-	Utworzyc certyfikat dla tego klucza podpisany nim samym:
-	openssl req -new -x509 -days 365 -key server-key.pem -out server-cert.pem
+			-cert ca-cert.pem -in server.csr -out master-cert.pem
 */
 
 	Informacje o certyfikacie pokazuje:
-		openssl x509 -noout -text -in server-cert.pem
+		openssl x509 -noout -text -in master-cert.pem
 
 	Informacje o kluczu pokazuje:
-		openssl rsa -noout -text -in server-key.pem
+		openssl rsa -noout -text -in master-key.pem
 
 na kliencie:
 	utworzyc klucz prywatny
