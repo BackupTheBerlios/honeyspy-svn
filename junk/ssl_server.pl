@@ -31,7 +31,7 @@ if(!($sock = IO::Socket::SSL->new( Listen => 5,
 
 					SSL_key_file => '../certs/server-key.pem',
 					SSL_cert_file => '../certs/server-cert.pem',
-					SSL_ca_file => '../certs/ca-cert.pem',
+					SSL_ca_file => '../certs/server-cert.pem',
 
 				   SSL_verify_mode => 0x01,
 				   SSL_passwd_cb => sub {return "bluebell"},
@@ -55,7 +55,6 @@ while (1) {
 		warn "connection opened ($s).\n";
 
 		if( ref($sock) eq "IO::Socket::SSL") {
-			print "->".($s->dump_peer_certificate())."<-";
 			$subject_name = $s->peer_certificate("subject");
 			$issuer_name = $s->peer_certificate("issuer");
 		}

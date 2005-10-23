@@ -30,7 +30,7 @@ if(!($sock = IO::Socket::SSL->new( PeerAddr => 'localhost',
 
 					SSL_key_file => '../certs/sensor1-key.pem',
 					SSL_cert_file => '../certs/sensor1-cert.pem',
-					SSL_ca_file => '../certs/ca-cert.pem',
+					SSL_ca_file => '../certs/server-cert.pem',
 
 				   SSL_verify_mode => 0x01,
 				   SSL_passwd_cb => sub { return "opossum" },
