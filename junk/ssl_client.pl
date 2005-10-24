@@ -1,27 +1,13 @@
-#
-# a test client for testing IO::Socket::SSL-class's behavior
-# (marko.asplund at kronodoc.fi).
-#
-# $Id: ssl_client.pl,v 1.7 2002/01/04 08:45:12 aspa Exp $.
-#
-
 
 use strict;
 use IO::Socket::SSL;
 
-my ($v_mode, $sock, $buf);
+use Sensor;
+use Storable 'thaw';
 
-if($ARGV[0] eq "DEBUG") { $IO::Socket::SSL::DEBUG = 4; }
+my ($sock, $buf);
 
-# Check to make sure that we were not accidentally run in the wrong
-# directory:
-unless (-d "certs") {
-    if (-d "../certs") {
-	chdir "..";
-    } else {
-	die "Please run this example from the IO::Socket::SSL distribution directory!\n";
-    }
-}
+#$IO::Socket::SSL::DEBUG = 4;
 
 if(!($sock = IO::Socket::SSL->new( PeerAddr => 'localhost',
 				   PeerPort => '9000',
@@ -33,7 +19,6 @@ if(!($sock = IO::Socket::SSL->new( PeerAddr => 'localhost',
 					SSL_ca_file => '../certs/master-cert.pem',
 
 				   SSL_verify_mode => 0x01,
-				   SSL_passwd_cb => sub { return "opossum" },
 				 ))) {
     warn "unable to create socket: ", &IO::Socket::SSL::errstr, "\n";
     exit(0);
@@ -51,8 +36,35 @@ if( ref($sock) eq "IO::Socket::SSL") {
 warn "cipher: $cipher.\n", "server cert:\n", 
     "\t '$subject_name' \n\t '$issuer_name'.\n\n";
 
-my ($buf) = $sock->getlines;
+#my ($buf) = $sock->getlines;
+
+{
+	sysread($sock, $buf, 4);
+	my $len = unpack('N', $buf);
+	sysread($sock, $buf, $len);
+	my ($function, $arrayctx, @args) = @{thaw($buf)};
+
+	local $" = ',';
+	print "Klient powinien wywo³aæ $function(@args) w kontekscie "
+		. ($arrayctx?'listowym':'skalarnym') . "\n";
+
+	
+	no strict 'refs';
+	$function =~ s/.*:://;
+	&{*{$function}};
+}
+
+#$|=1;
+#while (defined($buf = <$sock>)) {
+#	print "$buf";
+#}
+
 
 $sock->close();
 
 print "read: '$buf'.\n";
+
+sub blah() {
+	print "Funkcja blah\n";
+}
+

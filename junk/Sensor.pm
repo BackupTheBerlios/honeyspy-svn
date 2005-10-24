@@ -2,7 +2,7 @@
 
 package Sensor;
 
-use Storable 'nstore_fd';
+use Storable qw(nstore_fd freeze);
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -52,7 +52,13 @@ sub call {
 	print "Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
 	. ($arrayctx ? 'listowym' : 'skalarnym') . "\n";
 
-	nstore_fd([$name, $arrayctx, @args], $self->{socket});
+	my $fh = $self->{socket};
+	my $serialized = freeze [$name, $arrayctx, @args];
+	print $fh pack('N', length($serialized));
+	print $fh $serialized;
+	#nstore_fd([$name, $arrayctx, @args], $fh);
+#	$fh->flush();
+#	$fh->flush();
 }
 
 sub DESTROY {

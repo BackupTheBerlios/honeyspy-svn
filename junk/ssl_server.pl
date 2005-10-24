@@ -1,27 +1,16 @@
-#
-# a test server for testing IO::Socket::SSL-class's behavior
-# (marko.asplund at kronodoc.fi).
-#
-# $Id: ssl_server.pl,v 1.7 2000/11/08 09:25:21 aspa Exp $.
-#
 
 use strict;
+
 use IO::Socket::SSL;
+use Sensor;
 
+use Storable qw(nstore_fd store_fd);
 
-my ($sock, $s, $v_mode);
+my ($sock, $s);
+my %sensors;
 
-if($ARGV[0] eq "DEBUG") { $IO::Socket::SSL::DEBUG = 1; }
+$IO::Socket::SSL::DEBUG = 1;
 
-# Check to make sure that we were not accidentally run in the wrong
-# directory:
-unless (-d "certs") {
-    if (-d "../certs") {
-	chdir "..";
-    } else {
-	die "Please run this example from the IO::Socket::SSL distribution directory!\n";
-    }
-}
 
 if(!($sock = IO::Socket::SSL->new( Listen => 5,
 				   LocalAddr => 'localhost',
@@ -34,12 +23,10 @@ if(!($sock = IO::Socket::SSL->new( Listen => 5,
 					SSL_ca_file => '../certs/master-cert.pem',
 
 				   SSL_verify_mode => 0x01,
-				   SSL_passwd_cb => sub {return "bluebell"},
 				 )) ) {
     warn "unable to create socket: ", &IO::Socket::SSL::errstr, "\n";
     exit(0);
 }
-warn "socket created: $sock.\n";
 
 while (1) {
 	warn "waiting for next connection.\n";
@@ -58,18 +45,36 @@ while (1) {
 			$subject_name = $s->peer_certificate("subject");
 			$issuer_name = $s->peer_certificate("issuer");
 		}
+		if (!$subject_name or !$issuer_name) {
+			# klient nie mia³ certyfikatu
+			close $s;
+			next;
+		}
 
 		warn "\t subject: '$subject_name'.\n";
 		warn "\t issuer: '$issuer_name'.\n";
 
-		my $date = localtime();
-		print $s "my date command says it's: '$date'";
+		my $sensor_name = $subject_name;
+		for ($sensor_name) {
+			s'.*CN='';
+			s'/.*'';
+		}
+		my $sensor = Sensor::new($sensor_name);
+
+#		store_fd(['rob', 'now'], $s);
+#		$s->flush();
+
+		$sensor->{'socket'} = $s;
+		$sensors{$sensor_name} = $sensor;
+		\($sensor->blah('a', 'b'));
+
+#		my $date = localtime();
+#		print $s "my date command says it's: '$date'";
+
 		close($s);
 		warn "\t connection closed.\n";
 	}
 }
 
-
 $sock->close();
 
-warn "loop exited.\n";
