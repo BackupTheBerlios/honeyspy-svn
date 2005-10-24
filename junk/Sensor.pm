@@ -2,11 +2,15 @@
 
 package Sensor;
 
+use Log::Log4perl (':easy');
+
 use Storable qw(nstore_fd freeze);
 
 require Exporter;
 @ISA = qw(Exporter);
 # (nie wolno eksportowac metod)
+
+my $logger = get_logger();
 
 #
 # Sensor powinien miec atrybuty
@@ -15,7 +19,7 @@ require Exporter;
 #
 
 sub new($) {
-	print "konstruktor\n";
+	$logger->debug("konstruktor\n");
 	my $self = {
 		'name' => $_[0],
 		'socket' => \*STDOUT,
@@ -24,7 +28,7 @@ sub new($) {
 }
 
 sub info() {
-	print "Jestem sensor ${\($_[0]->{name})}\n";
+	$logger->debug("Jestem sensor ${\($_[0]->{name})}\n");
 }
 
 #
@@ -37,7 +41,7 @@ sub getName() {
 }
 
 sub AUTOLOAD {
-	print "Powinienem sprobowac wywolac zdalnie $AUTOLOAD:\n";
+	$logger->debug("Powinienem sprobowac wywolac zdalnie $AUTOLOAD:\n");
 	shift->call($AUTOLOAD, defined wantarray, @_);
 }
 
@@ -49,8 +53,8 @@ sub call {
 	my ($self, $name, $arrayctx, @args) = @_;
 	my $sensor = $self->{name};
 	local $" = ',';
-	print "Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
-	. ($arrayctx ? 'listowym' : 'skalarnym') . "\n";
+	$logger->debug("Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
+	. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
 
 	my $fh = $self->{socket};
 	my $serialized = freeze [$name, $arrayctx, @args];
@@ -62,7 +66,7 @@ sub call {
 }
 
 sub DESTROY {
-	print "Destruktor Sensora ${\($_[0]->{'name'})}\n";
+	$logger->debug("Destruktor Sensora ${\($_[0]->{'name'})}\n");
 }
 
 1;

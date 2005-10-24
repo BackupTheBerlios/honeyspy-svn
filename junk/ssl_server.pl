@@ -1,10 +1,16 @@
 
+use Log::Log4perl qw(:easy);
 use strict;
 
 use IO::Socket::SSL;
 use Sensor;
 
 use Storable qw(nstore_fd store_fd);
+
+
+my $logger = get_logger();
+Log::Log4perl->easy_init($DEBUG);
+
 
 my ($sock, $s);
 my %sensors;
@@ -24,22 +30,22 @@ if(!($sock = IO::Socket::SSL->new( Listen => 5,
 
 				   SSL_verify_mode => 0x01,
 				 )) ) {
-    warn "unable to create socket: ", &IO::Socket::SSL::errstr, "\n";
+    $logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, "\n");
     exit(0);
 }
 
 while (1) {
-	warn "waiting for next connection.\n";
+	$logger->info("waiting for next connection.\n");
 
 	while(($s = $sock->accept())) {
 		my ($peer_cert, $subject_name, $issuer_name, $date, $str);
 
 		if( ! $s ) {
-			warn "error: ", $sock->errstr, "\n";
+			$logger->info("error: ", $sock->errstr, "\n");
 			next;
 		}
 
-		warn "connection opened ($s).\n";
+		$logger->info("connection opened ($s).\n");
 
 		if( ref($sock) eq "IO::Socket::SSL") {
 			$subject_name = $s->peer_certificate("subject");
@@ -51,8 +57,8 @@ while (1) {
 			next;
 		}
 
-		warn "\t subject: '$subject_name'.\n";
-		warn "\t issuer: '$issuer_name'.\n";
+		$logger->info("\t subject: '$subject_name'.\n");
+		$logger->info("\t issuer: '$issuer_name'.\n");
 
 		my $sensor_name = $subject_name;
 		for ($sensor_name) {
@@ -72,7 +78,7 @@ while (1) {
 #		print $s "my date command says it's: '$date'";
 
 		close($s);
-		warn "\t connection closed.\n";
+		$logger->info("\t connection closed.\n");
 	}
 }
 
