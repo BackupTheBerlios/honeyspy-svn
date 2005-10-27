@@ -9,6 +9,7 @@ use Storable qw(nstore_fd freeze);
 require Exporter;
 @ISA = qw(Exporter);
 # (nie wolno eksportowac metod)
+@EXPORT = ('sendToPeer');
 
 my $logger = get_logger();
 
@@ -42,7 +43,7 @@ sub getName() {
 
 sub AUTOLOAD {
 	$logger->debug("Powinienem sprobowac wywolac zdalnie $AUTOLOAD:\n");
-	shift->call($AUTOLOAD, defined wantarray, @_);
+	shift->call($AUTOLOAD, wantarray, @_);
 }
 
 
@@ -54,20 +55,29 @@ sub call {
 	my $sensor = $self->{name};
 	local $" = ',';
 	$logger->debug("Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
-	. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
+		. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
 
-	my $fh = $self->{socket};
-	my $serialized = freeze [$name, $arrayctx, @args];
-	print $fh pack('N', length($serialized));
-	print $fh $serialized;
-	#nstore_fd([$name, $arrayctx, @args], $fh);
-#	$fh->flush();
-#	$fh->flush();
+#	my $fh = $self->{socket};
+#	my $serialized = freeze [$name, $arrayctx, @args];
+
+#	print $fh pack('N', length($serialized));
+#	print $fh $serialized;
+
+	sendToPeer($self->{socket}, $name, $arrayctx, @args);
 }
 
 sub DESTROY {
 	$logger->debug("Destruktor Sensora ${\($_[0]->{'name'})}\n");
 }
+
+
+sub sendToPeer {
+	my ($sock, $serialized) = (shift, freeze [@_]);
+	print $sock pack('N', length($serialized));
+	print $sock $serialized;
+	print "wysylam\n";
+}
+
 
 1;
 

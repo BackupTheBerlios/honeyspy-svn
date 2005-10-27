@@ -3,7 +3,7 @@ use strict;
 use IO::Socket::SSL;
 
 use Sensor;
-use Storable 'thaw';
+use Storable ('thaw', 'freeze');
 
 my ($sock, $buf);
 
@@ -51,7 +51,26 @@ warn "cipher: $cipher.\n", "server cert:\n",
 	
 	no strict 'refs';
 	$function =~ s/.*:://;
-	&{*{$function}};
+
+	$SIG{PIPE} = sub {print "x\n"};
+
+	my $serialized;
+	if (defined $arrayctx) {
+		if ($arrayctx) {
+			my @array_result = @{[&{*{$function}}]};
+			$serialized = freeze [@array_result];
+			sendToPeer($sock, @array_result);
+		}
+		else {
+			my $scalar_result = scalar &{*{$function}};
+			$serialized = freeze [$scalar_result];
+			sendToPeer($sock, $scalar_result);
+		}
+	}
+	else { # void context
+		&{*{$function}};
+	}
+
 }
 
 #$|=1;
@@ -65,6 +84,15 @@ $sock->close();
 print "read: '$buf'.\n";
 
 sub blah() {
-	print "Funkcja blah\n";
+	print "Funkcja blah ";
+	if (!defined wantarray) {
+		print "Kontekst void\n";
+	}
+	elsif (wantarray) {
+		return ('el1', 'el2', 'fjaksdjfs');
+	}
+	else {
+		return 'asdfasfd';
+	}
 }
 

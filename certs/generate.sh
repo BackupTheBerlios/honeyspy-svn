@@ -69,5 +69,5 @@ if [ "$1" = 'sensor' ]; then
 fi
 
 
-echo "U¿ycie:\n\t$0 clean|master|sensor";
+echo -e "U¿ycie:\n\t$0 clean|master|sensor";
 

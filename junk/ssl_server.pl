@@ -5,7 +5,7 @@ use strict;
 use IO::Socket::SSL;
 use Sensor;
 
-use Storable qw(nstore_fd store_fd);
+use Storable qw(nstore_fd store_fd thaw);
 
 
 my $logger = get_logger();
@@ -52,13 +52,14 @@ while (1) {
 			$issuer_name = $s->peer_certificate("issuer");
 		}
 		if (!$subject_name or !$issuer_name) {
-			# klient nie mia³ certyfikatu
+			$logger->fatal("£acz±cy siê sensor nie przedstawi³ certyfikatu.\n");
 			close $s;
 			next;
 		}
 
 		$logger->info("\t subject: '$subject_name'.\n");
 		$logger->info("\t issuer: '$issuer_name'.\n");
+
 
 		my $sensor_name = $subject_name;
 		for ($sensor_name) {
@@ -67,15 +68,22 @@ while (1) {
 		}
 		my $sensor = Sensor::new($sensor_name);
 
-#		store_fd(['rob', 'now'], $s);
-#		$s->flush();
-
 		$sensor->{'socket'} = $s;
 		$sensors{$sensor_name} = $sensor;
-		\($sensor->blah('a', 'b'));
 
-#		my $date = localtime();
-#		print $s "my date command says it's: '$date'";
+#		$sensor->blah('a', 'b');
+#		scalar $sensor->blah('a', 'b');
+		@{[$sensor->blah('a', 'b')]};
+
+		# odczytanie odpowiedzi
+		my $buf;
+		sysread($s, $buf, 4);
+		my $len = unpack('N', $buf);
+		sysread($s, $buf, $len);
+		my @resp = @{thaw($buf)};
+		$logger->debug("Odpowiedz sensora:\n");
+		local $" = "\n->";
+		$logger->debug("@resp\n");
 
 		close($s);
 		$logger->info("\t connection closed.\n");
