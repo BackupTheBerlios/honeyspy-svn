@@ -6,6 +6,7 @@ use strict;
 use IO::Select;
 use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
+use IO::Socket::SSL; # qw(debug4);
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -45,6 +46,8 @@ sub new($) {
 		'r_handlers' => {},
 		'w_handlers' => {},
 		'e_handlers' => {},
+      'stimeout' => 2,
+      'connected' => 0
 	};
 	return bless $self, $class;
 }
@@ -96,53 +99,59 @@ sub sendToPeer {
 	print "wysylam\n";
 }
 
+sub _connect_to_master {
+   my($self) = @_;
+	my $master;
+	if(!($master = IO::Socket::SSL->new( PeerAddr => 'localhost',
+		PeerPort => '9000',
+		Proto    => 'tcp',
+		SSL_use_cert => 1,
+
+		SSL_key_file => '../certs/sensor1-key.pem',
+		SSL_cert_file => '../certs/sensor1-cert.pem',
+		SSL_ca_file => '../certs/master-cert.pem',
+
+		SSL_verify_mode => 0x01,
+	))) {
+		$logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, ", $!\n");
+		exit(1);
+	}
+	my ($subject_name, $issuer_name, $cipher, $trusted_master);
+	$trusted_master = 0;
+	if( ref($master) eq "IO::Socket::SSL") {
+		$subject_name = $master->peer_certificate("subject");
+		$issuer_name = $master->peer_certificate("issuer");
+		$cipher = $master->get_cipher();
+
+		$logger->debug("Certificate's subject: $subject_name");
+		$logger->debug("Certificate's issuer: $issuer_name");
+
+		if ($subject_name eq $CORRECT_CERT
+			&& $issuer_name eq $CORRECT_CERT) {
+				$trusted_master = 1;
+		}
+	}
+	if (!$trusted_master) {
+		$logger->fatal("Master doesn't have correct certificate!");
+		exit(1);
+	}
+	$logger->info("Certificate recognized.");
+	$logger->debug("Using cipher: $cipher");
+
+	$self->{'r_set'}->add($master);
+	$self->{'e_set'}->add($master);
+	$self->{'r_handlers'}{$master} = \&process_command;
+
+	$self->{'connected'} = 1;
+}
+
 sub run {
 	my $self = shift;
 	$logger->info("Starting node " . $self->{'name'});
 
-	my $master;
 	if ($self->{'mode'} eq 'sensor') {
-		if(!($master = IO::Socket::SSL->new( PeerAddr => 'localhost',
-					PeerPort => '9000',
-					Proto    => 'tcp',
-					SSL_use_cert => 1,
-
-					SSL_key_file => '../certs/sensor1-key.pem',
-					SSL_cert_file => '../certs/sensor1-cert.pem',
-					SSL_ca_file => '../certs/master-cert.pem',
-
-					SSL_verify_mode => 0x01,
-				))) {
-			$logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, ", $!\n");
-			exit(1);
-		}
-		my ($subject_name, $issuer_name, $cipher, $trusted_master);
-		$trusted_master = 0;
-		if( ref($master) eq "IO::Socket::SSL") {
-			$subject_name = $master->peer_certificate("subject");
-			$issuer_name = $master->peer_certificate("issuer");
-			$cipher = $master->get_cipher();
-
-			$logger->debug("Certificate's subject: $subject_name");
-			$logger->debug("Certificate's issuer: $issuer_name");
-
-			if ($subject_name eq $CORRECT_CERT
-				&& $issuer_name eq $CORRECT_CERT) {
-					$trusted_master = 1;
-			}
-		}
-		if (!$trusted_master) {
-			$logger->fatal("My master doesn't have correct certificate!");
-			exit(1);
-		}
-		$logger->info("Certificate recognized.");
-		$logger->debug("Using cipher: $cipher");
-
-		$self->{'r_set'}->add($master);
-		$self->{'e_set'}->add($master);
-		$self->{'r_handlers'}{$master} = \&process_command;
+		$self->_connect_to_master();
 	}
-
 
 	$logger->debug("Entering main loop - node " . $self->{'name'});
 	for (;;) {
@@ -150,7 +159,19 @@ sub run {
 
 		my ($r_ready, $w_ready, $e_ready) =
 			IO::Select->select(
-				$self->{'r_set'}, $self->{'w_set'}, $self->{'e_set'});
+				$self->{'r_set'}, $self->{'w_set'}, $self->{'e_set'},
+				$self->{'stimeout'});
+
+		if (!defined($r_ready)) {
+			$logger->debug("Timeout");
+			if ($self->{'mode'} eq 'sensor') {
+				if (! $self->{'connected'}) {
+					$logger->debug("Trying to reconnect to my master");
+					$self->_connect_to_master();
+				}
+			}
+			next;
+		}
 
 		foreach my $fh (@$r_ready) {
 			&{$self->{'r_handlers'}{$fh}}($self, $fh)
@@ -171,6 +192,7 @@ sub process_command {
 		$logger->debug("My master closed connection.");
 		$self->{'r_set'}->remove($sock);
 		$self->{'e_set'}->remove($sock);
+		$self->{'connected'} = 0;
 		close($sock);
 	}
 	else {
