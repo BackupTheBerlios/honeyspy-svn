@@ -21,11 +21,13 @@ my $logger = get_logger();
 
 sub new($) {
 	$logger->debug("konstruktor\n");
+
+	my $class = ref($_[0]) or $_[0];
 	my $self = {
-		'name' => $_[0],
+		'name' => $_[1],
 		'socket' => \*STDOUT,
 	};
-	return bless $self;
+	return bless $self, $class;
 }
 
 sub info() {

@@ -66,7 +66,7 @@ while (1) {
 			s'.*CN='';
 			s'/.*'';
 		}
-		my $sensor = Sensor::new($sensor_name);
+		my $sensor = Sensor->new($sensor_name);
 
 		$sensor->{'socket'} = $s;
 		$sensors{$sensor_name} = $sensor;
