@@ -1,16 +1,31 @@
 #!/usr/bin/perl -w
 
+use strict;
+
 use Log::Log4perl (':easy');
+use Getopt::Long;
+use Master;
+use Node;
+
 Log::Log4perl->easy_init($DEBUG);
 
-use strict;
-use Master;
+my($master_mode);
+
+GetOptions(
+	'master|m' => \$master_mode
+);
 
 
-my $master = Master->new('laptop');
-print $master . "\n";
-
-$master->run();
+if ($master_mode) {
+	my $master = Master->new('laptop');
+	print $master . "\n";
+	$master->run();
+}
+else {
+	my $node = Node->new('laptop');
+	print $node . "\n";
+	$node->run();
+}
 
 
 exit;

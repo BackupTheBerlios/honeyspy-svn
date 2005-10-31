@@ -73,7 +73,7 @@ while (1) {
 
 #		$sensor->blah('a', 'b');
 #		scalar $sensor->blah('a', 'b');
-		@{[$sensor->blah('a', 'b')]};
+#		@{[$sensor->blah('a', 'b')]};
 
 		# odczytanie odpowiedzi
 		my $buf;

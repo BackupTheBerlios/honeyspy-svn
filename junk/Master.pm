@@ -29,7 +29,8 @@ sub new($) {
 	my $class = ref($_[0]) || $_[0];
 	my $self = $class->SUPER::new(@_[1..$#_]);
 
-#	$self{'socket'} = \*STDOUT;
+	$self->{'mode'} = 'master';
+#	$self->{'socket'} = \*STDOUT;
 #  ...
 
 	return $self;
@@ -80,41 +81,58 @@ sub run {
 
 				SSL_verify_mode => 0x01,
 			)) ) {
-		$logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, "\n");
+		$logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, ", $!\n");
 		exit(1);
 	}
+	$self->{'main_sock'} = $main_sock;
+	$self->{'r_set'}->add($main_sock);
 
+	$self->{'r_handlers'}{$main_sock} = \&accept_client;
 
-	my $r_set = new IO::Select($main_sock);
-	my $w_set = new IO::Select($main_sock);
+	local $| = 1;
 
-	$| = 1;
-	while (1) {
-		$logger->debug("Waiting for data...");
-		my ($r_ready, $w_ready, $e_ready) = IO::Select->select($r_set, $w_set);
-		foreach my $fh (@$r_ready) {
-			if ($fh == $main_sock) {
-				$logger->info("Client connected.");
-				my $client = $main_sock->accept();
-				$w_set->add($client);
-			}
-			else {
-			}
-		}
-		foreach my $fh (@$w_ready) {
-			if ($fh == $main_sock) {
-				
-			}
-			else {
-				print $fh "hello, client.\n";
-				$w_set->remove($fh);
-				close $fh;
-			}
-		}
-	}
+	$SIG{INT} = sub {
+		$logger->info("Caught SIGINT.");
+		close $main_sock;
+		$logger->info("Closed main socket.");
+		exit(0);
+	};
+
+	$self->SUPER::run();
 
 }
 
+sub accept_client {
+	my $self = shift;
+
+	$logger->info("Client connected.");
+	my $client = $self->{'main_sock'}->accept();
+	$self->{'w_set'}->add($client);
+	$self->{'r_set'}->add($client);
+	$self->{'w_handlers'}{$client} = \&serve_client;
+	$self->{'r_handlers'}{$client} = \&read_from_client;
+}
+
+sub read_from_client {
+	my($self, $sock) = @_;
+	
+	if ($sock->peek(undef, 1) == 0) {
+		$self->{'w_set'}->remove($sock);
+		$self->{'r_set'}->remove($sock);
+		delete $self->{'w_handlers'}{$sock};
+		delete $self->{'r_handlers'}{$sock};
+		$logger->info("Sensor closed connection");
+	}
+}
+
+sub serve_client {
+	my($self, $sock) = @_;
+
+	$logger->info("Sending data to client.");
+	print $sock "Hello, my dear client.\n";
+	$self->{'w_set'}->remove($sock);
+#	close $sock;
+}
 
 1;
 
