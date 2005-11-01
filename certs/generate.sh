@@ -51,6 +51,10 @@ if [ "$1" = 'sensor' ]; then
 		exit 1
 	fi
 
+	mkdir -p demoCA/newcerts 2>/dev/null
+	touch demoCA/index.txt
+	[ ! -e demoCA/serial ] && echo 01 > demoCA/serial
+
 	echo "Nazwa sensora: "
 	read sensor
 	[ "$sensor" ] || exit 1
