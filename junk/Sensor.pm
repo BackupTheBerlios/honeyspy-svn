@@ -16,17 +16,30 @@ my $logger = get_logger();
 #
 # Sensor powinien miec atrybuty
 # 	nazwa
-# 	deskryptor gniazda
+# 	uchwyt gniazda (gniazda do sensora! nie mastera)
+# 	referencja do obiekty klasy Master
 #
 
 sub new($) {
 	$logger->debug("konstruktor\n");
 
-	my $class = ref($_[0]) or $_[0];
+	my $class = ref($_[0]) || $_[0];
 	my $self = {
-		'name' => $_[1],
+		'name' => undef,
 		'socket' => \*STDOUT,
+		'master' => undef,
 	};
+
+
+	if (ref($_[1]) eq 'HASH')  {
+		foreach my $attr qw(name socket master) {
+			$self->{$attr} = $_[1]->{$attr} if defined $_[1]->{$attr};
+		}
+	}
+	else {
+		$self->{'name'} = $_[1];
+	}
+
 	return bless $self, $class;
 }
 
@@ -42,6 +55,34 @@ sub info() {
 sub getName() {
 	return shift->{'name'};
 }
+
+
+#
+# Czyta komunikat od sensora (sa dane)
+#
+sub read {
+	my ($self) = @_;
+	my ($sock) = $self->{'socket'};
+	$logger->debug("Reading data from sensor");
+
+	if ($sock->peek(undef, 1) == 0) {
+		$logger->info("Sensor closed connection");
+		$self->{'master'}->removefh($sock, 'rwe');
+	}
+}
+
+#
+# Pisze dane do sensora (gniazdo gotowe)
+#
+sub write {
+	my ($self) = @_;
+	my ($sock) = $self->{'socket'};
+	$logger->debug("Writing data to sensor");
+
+	print $sock "Hello, my dear client.\n";
+	$self->{'master'}->remove_sensor($self);
+}
+
 
 sub AUTOLOAD {
 	$logger->debug("Powinienem sprobowac wywolac zdalnie $AUTOLOAD:\n");

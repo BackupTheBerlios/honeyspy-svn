@@ -60,7 +60,6 @@ while (1) {
 		$logger->info("\t subject: '$subject_name'.\n");
 		$logger->info("\t issuer: '$issuer_name'.\n");
 
-
 		my $sensor_name = $subject_name;
 		for ($sensor_name) {
 			s'.*CN='';

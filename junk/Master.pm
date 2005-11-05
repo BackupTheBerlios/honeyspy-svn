@@ -3,7 +3,9 @@
 package Master;
 
 use strict;
+use Carp;
 use Node;
+use Sensor;
 
 use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
@@ -30,6 +32,7 @@ sub new($) {
 	my $self = $class->SUPER::new(@_[1..$#_]);
 
 	$self->{'mode'} = 'master';
+	$self->{'sensors'} = {};
 #	$self->{'socket'} = \*STDOUT;
 #  ...
 
@@ -54,21 +57,13 @@ sub DESTROY {
 }
 
 
-sub sendToPeer {
-	my ($sock, $serialized) = (shift, freeze [@_]);
-	print $sock pack('N', length($serialized));
-	print $sock $serialized;
-	print "wysylam\n";
-}
-
 sub run {
 	my $self = shift;
 
 	$logger->info("Starting master server " . $self->{'name'});
-	$logger->debug("Entering main loop - master " . $self->{'name'});
 
-	my $main_sock;
-	if(!($main_sock = IO::Socket::SSL->new(
+	my $listen_sock;
+	if(!($listen_sock = IO::Socket::SSL->new(
 				Listen => 5,
 				LocalAddr => 'localhost',
 				LocalPort => 9000,
@@ -81,57 +76,89 @@ sub run {
 
 				SSL_verify_mode => 0x01,
 			)) ) {
-		$logger->fatal("unable to create socket: ", &IO::Socket::SSL::errstr, ", $!\n");
+		$logger->fatal("unable to create socket: ", IO::Socket::SSL->errstr, ", $!\n");
 		exit(1);
 	}
-	$self->{'main_sock'} = $main_sock;
-	$self->{'r_set'}->add($main_sock);
-
-	$self->{'r_handlers'}{$main_sock} = \&accept_client;
-
-	local $| = 1;
+	$self->{'listen_sock'} = $listen_sock;
+	$self->addfh($listen_sock, 'r');
+	$self->{'r_handlers'}{$listen_sock} = \&accept_client;
 
 	$SIG{INT} = sub {
 		$logger->info("Caught SIGINT.");
-		close $main_sock;
+		close $listen_sock;
 		$logger->info("Closed main socket.");
 		exit(0);
 	};
 
+	# Glowna petla wezla sieci
 	$self->SUPER::run();
 
 }
 
+
+sub remove_sensor {
+	my ($self, $sensor) = @_;
+	$logger->debug('Removing sensor ' . $sensor->{'name'});
+
+	delete $self->{'sensors'}{$sensor->{'socket'}};
+	delete $self->{'sensors'}{$sensor->{'name'}};
+	$self->removefh($sensor->{'socket'});
+	close $self->{'socket'};
+}
+
+
+#
+# Obsluga klienta ktory sie polaczyl
+# Uczynienie z niego Sensora
+#
 sub accept_client {
-	my $self = shift;
+	my ($self) = @_;
 
 	$logger->info("Client connected.");
-	my $client = $self->{'main_sock'}->accept();
-	$self->{'w_set'}->add($client);
-	$self->{'r_set'}->add($client);
-	$self->{'w_handlers'}{$client} = \&serve_client;
-	$self->{'r_handlers'}{$client} = \&read_from_client;
+	my $socket = $self->{'listen_sock'}->accept();
+
+	my $authorized = 0;
+	my ($subject_name, $issuer_name);
+	if ($socket) {
+		$subject_name = $socket->peer_certificate("subject");
+		$issuer_name = $socket->peer_certificate("issuer");
+		$authorized = 1 if ($subject_name && $issuer_name);
+	}
+	if (!$authorized) {
+		$logger->info("Unauthorized connection dropped");
+		return;
+	}
+
+	my $sensor_name = $subject_name;
+	for ($sensor_name) {
+		s'.*CN='';
+		s'/.*'';
+	}
+
+	$logger->info("Sensor $sensor_name joined the network");
+
+	my $sensor = new Sensor({
+			name => $sensor_name,
+			socket => $socket,
+			master => $self,
+		});
+	$self->{'sensors'}{$sensor_name} = $sensor;
+	$self->{'sensors'}{$socket} = $sensor;
+
+	$self->addfh($socket, 'rw');
+	$self->{'w_handlers'}{$socket} = \&serve_client;
+	$self->{'r_handlers'}{$socket} = \&read_from_client;
 }
+
+
 
 sub read_from_client {
 	my($self, $sock) = @_;
 	
 	if ($sock->peek(undef, 1) == 0) {
-		$self->{'w_set'}->remove($sock);
-		$self->{'r_set'}->remove($sock);
-		delete $self->{'w_handlers'}{$sock};
-		delete $self->{'r_handlers'}{$sock};
+		$self->removefh($sock, 'rw');
 		$logger->info("Sensor closed connection");
 	}
-}
-
-sub serve_client {
-	my($self, $sock) = @_;
-
-	$logger->info("Sending data to client.");
-	print $sock "Hello, my dear client.\n";
-	$self->{'w_set'}->remove($sock);
-#	close $sock;
 }
 
 1;
