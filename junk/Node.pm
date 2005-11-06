@@ -7,7 +7,9 @@ use IO::Select;
 use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
+use IO::Socket::INET;
 use Storable ('thaw');
+use POSIX qw(setsid);
 use Carp;
 use Master;
 
@@ -80,10 +82,17 @@ sub getName() {
 
 sub getSensors() {
 	my ($self) = @_;
-	my @result = $self->{'name'};
-	push @result, keys ($self->{'sensors'})
-		if (exists($self->{'sensors'}));
-	return @result;
+	my @names = $self->{'name'};
+	my %sensors = ();
+
+	foreach (keys %{$self->{'sensors'}}) {
+		if (! exists($sensors{$self->{'sensors'}{$_}})) {
+			push @names, $self->{'sensors'}{$_}{'name'};
+			$sensors{$self->{'sensors'}{$_}} = 1;
+		}
+	}
+
+	return @names;
 }
 
 
@@ -93,7 +102,7 @@ sub info {
 
 
 sub DESTROY {
-	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
+#	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
 }
 
 sub kill {
@@ -124,6 +133,54 @@ sub delMAC {
 	my ($addr) = @_;
 	$logger->info("Disabling MAC mangling on $addr");
 }
+
+
+sub addService {
+	my ($self, $addr, $proto, $port, $script, @args) = @_;
+	$logger->info("Adding service on $addr:$port ($proto)");
+
+	my $socket = new IO::Socket::INET(
+		LocalAddr => $addr,
+		LocalPort => $port,
+		Proto => $proto,
+		Listen => 5,
+		Reuse => 1
+	);
+	if (!$socket) {
+		my $msg = "Couldn't open socket: $!";
+		$logger->error($msg);
+		return $msg;
+	}
+
+	$self->addfh($socket, 'r');
+	$self->{'r_handlers'}{$socket} = sub {
+		my $client = $socket->accept();
+		if (! $client) {
+			$logger->error("Couldn't accept connection ($!)");
+			return 1;
+		}
+		$logger->debug("Connection to service $script from " . $client->peerhost);
+		$SIG{'CHLD'} = 'IGNORE';
+		my $pid = fork();
+		if (! $pid) {
+			setsid();
+			open(STDIN, "<&=".fileno($client));
+			open(STDOUT, ">&=".fileno($client));
+#			open(STDERR, ">&=".fileno($client));
+			{ exec($script, @args); }
+			$logger->error("Couldn't run script ($!)");
+			return 1;
+		}
+	};
+
+	return 0;
+}
+
+sub delService {
+	my ($self, $addr, $proto, $port) = @_;
+	$logger->info("Removing service from $addr:$port ($proto)");
+}
+
 
 sub sendToPeer {
 	my ($sock, $serialized) = (shift, freeze [@_]);
@@ -282,8 +339,17 @@ sub _callFunction {
 			@result = (scalar &{*{$function}}(@args));
 		}
 	};
-	if ($@) {
-		$result[0] = "Error $@ during excecution of remote called function";
+	for ($@) {
+		last unless ($@);
+
+		if (/Undefined subroutine/) {
+			$result[0] = "No such function ($function) on remote side";
+			last;
+		}
+		else {
+			$result[0] = "Error $_ during excecution of remote called function";
+		}
+
 		$logger->error($result[0]);
 	}
 	return @result;
@@ -325,20 +391,19 @@ sub process_command {
 
 
 sub runOnNode {
-	my ($self, $name, @what) = @_;
+	my ($self, $name, $function, @args) = @_;
 	my @result;
 
 	if ($name eq $self->{'name'}) {
 		no strict 'refs';
-		my ($function, $arrayctx, @args) = @what;
-		return $self->_callFunction($function, $arrayctx, @args);
+		return $self->_callFunction($function, wantarray, @args);
 	}
 
 	return "No such node: $name"
 		unless exists($self->{'sensors'}{$name});
 
 	my $socket = $self->{'sensors'}{$name}{'socket'};
-	Sensor::sendToPeer($socket, @what);
+	Sensor::sendToPeer($socket, $function, wantarray, @args);
 
 	# XXX tu by sie przydalo poprawic asynchronicznosc
 	return Sensor::recvFromPeer($socket);

@@ -102,7 +102,7 @@ sub remove_sensor {
 	delete $self->{'sensors'}{$sensor->{'socket'}};
 	delete $self->{'sensors'}{$sensor->{'name'}};
 	$self->removefh($sensor->{'socket'});
-	close $self->{'socket'};
+	close $sensor->{'socket'};
 }
 
 
@@ -137,6 +137,12 @@ sub accept_client {
 	if ($client_name eq 'admin') {
 		$logger->info("Administrator connected from " . $socket->peerhost);
 		$self->_configure_master($socket);
+		return;
+	}
+
+	if (exists($self->{'sensors'}{$client_name})) {
+		$logger->warn("Sensor $client_name is already connected!");
+		$logger->warn("Dropping connection.");
 		return;
 	}
 

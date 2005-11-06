@@ -4,6 +4,7 @@ use strict;
 
 use Sensor;
 use IO::Socket::SSL;
+use Term::ReadLine;
 use Log::Log4perl (':easy');
 Log::Log4perl->easy_init($DEBUG);
 
@@ -36,11 +37,14 @@ print <<EOF;
 ************************************************************
 EOF
 
+print "\nConnection established\n";
+
 my $prompt = '> ';
+my $term = new Term::ReadLine 'HoneySpy console';
 
 print $prompt;
-while (<STDIN>) {
-	chomp;
+while (defined($_ = $term->readline($prompt))) {
+	$term->addhistory($_) if /\S/;
 	my ($cmd, @args) = ($_);
 	if (/^(.*?)\s(.*)/) {
 		($cmd, @args) = ($1, split(/\s/, $2));

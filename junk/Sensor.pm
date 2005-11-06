@@ -26,7 +26,7 @@ sub new($) {
 	my $class = ref($_[0]) || $_[0];
 	my $self = {
 		'name' => undef,
-		'socket' => \*STDOUT,
+		'socket' => undef,
 		'master' => undef,
 	};
 
@@ -123,7 +123,6 @@ sub sendToPeer {
 	my ($sock, $serialized) = (shift, freeze [@_]);
 	print $sock pack('N', length($serialized));
 	print $sock $serialized;
-	print "wysylam\n";
 }
 
 sub recvFromPeer {
