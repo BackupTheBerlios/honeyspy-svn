@@ -9,7 +9,7 @@ use Storable qw(freeze thaw);
 require Exporter;
 @ISA = qw(Exporter);
 # (nie wolno eksportowac metod)
-@EXPORT = ('sendToPeer');
+@EXPORT = qw(sendToPeer recvFromPeer);
 
 my $logger = get_logger();
 
@@ -68,7 +68,9 @@ sub read {
 	if ($sock->peek(undef, 1) == 0) {
 		$logger->info("Sensor closed connection");
 		$self->{'master'}->remove_sensor($self);
+		return 0
 	}
+	return 1;
 }
 
 #
@@ -79,13 +81,13 @@ sub write {
 	my ($sock) = $self->{'socket'};
 	$logger->debug("Writing data to sensor");
 
-#	print $sock "Hello, my dear client.\n";
-
 	Sensor::sendToPeer($sock, 'info', 0);
 	$self->{'master'}{'r_handlers'}{$sock} = sub {
-		my $res = Sensor::recvFromPeer($sock);
-		$logger->info("Sensor replied: $res");
-		$self->{'master'}->removefh($sock, 'w');
+		if ($self->read) {
+			my $res = Sensor::recvFromPeer($sock);
+			$logger->info("Sensor replied: $res");
+			$self->{'master'}->removefh($sock, 'w');
+		}
 	};
 
 	$self->{'master'}->removefh($self->{'socket'}, 'w');
@@ -108,12 +110,6 @@ sub call {
 	local $" = ',';
 	$logger->debug("Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
 		. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
-
-#	my $fh = $self->{socket};
-#	my $serialized = freeze [$name, $arrayctx, @args];
-
-#	print $fh pack('N', length($serialized));
-#	print $fh $serialized;
 
 	sendToPeer($self->{socket}, $name, $arrayctx, @args);
 }

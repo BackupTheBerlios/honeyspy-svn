@@ -15,14 +15,21 @@ GetOptions(
 	'master|m' => \$master_mode
 );
 
+if ($#ARGV != 0) {
+	print "Usage:\n\t$0 [-m] <node_name>\n\n";
+	exit 1;
+}
+
+my $node_name = $ARGV[0];
+
 
 if ($master_mode) {
-	my $master = Master->new('laptop');
+	my $master = Master->new($node_name);
 	print $master . "\n";
 	$master->run();
 }
 else {
-	my $node = Node->new('laptop');
+	my $node = Node->new($node_name);
 	print $node . "\n";
 	$node->run();
 }

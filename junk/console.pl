@@ -7,10 +7,15 @@ use IO::Socket::SSL;
 use Log::Log4perl (':easy');
 Log::Log4perl->easy_init($DEBUG);
 
+if ($#ARGV != 1) {
+	print "Usage:\n\t$0 <host> <port>\n";
+	exit 1;
+}
+
 my $logger = get_logger();
 
-my $master = IO::Socket::SSL->new( PeerAddr => '127.0.0.1',
-	PeerPort => '9000',
+my $master = IO::Socket::SSL->new( PeerAddr => $ARGV[0],
+	PeerPort => $ARGV[1],
 	Proto    => 'tcp',
 	SSL_use_cert => 1,
 

@@ -9,6 +9,7 @@ use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
 use Storable ('thaw');
 use Carp;
+use Master;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -58,7 +59,7 @@ sub new($) {
 		'w_set' => new IO::Select(),
 		'e_set' => new IO::Select(),
 
-      'stimeout' => 2,
+      'stimeout' => 5,
       'reconnect' => 4, # tyle sekund miedzy reconnect
       'connected' => 0
 	};
@@ -72,7 +73,17 @@ sub new($) {
 # [automatyczna modifikacja wpisów w przestrzeni nazw modu³u]
 #
 sub getName() {
-	return shift->{'name'};
+	my ($self) = @_;
+	return $self->{'name'};
+}
+
+
+sub getSensors() {
+	my ($self) = @_;
+	my @result = $self->{'name'};
+	push @result, keys ($self->{'sensors'})
+		if (exists($self->{'sensors'}));
+	return @result;
 }
 
 
@@ -86,8 +97,12 @@ sub DESTROY {
 }
 
 sub kill {
-	$logger->info('Node is going down');
-	exit 0;
+	$logger->info('Node is going down in a moment');
+	$SIG{'ALRM'} = sub {
+		exit 0;
+	};
+	alarm 1;
+	return 0;
 }
 
 sub setFingerprint {
@@ -141,8 +156,8 @@ sub _connect_to_master {
 		Proto    => 'tcp',
 		SSL_use_cert => 1,
 
-		SSL_key_file => '../certs/sensor1-key.pem',
-		SSL_cert_file => '../certs/sensor1-cert.pem',
+		SSL_key_file => "../certs/".$self->{'name'}."-key.pem",
+		SSL_cert_file => "../certs/".$self->{'name'}."-cert.pem",
 		SSL_ca_file => '../certs/master-cert.pem',
 
 		SSL_verify_mode => 0x01);
@@ -252,6 +267,29 @@ sub run {
 	}
 }
 
+
+sub _callFunction {
+	my ($self, $function, $arrayctx, @args) = @_;
+	my @result;
+
+	eval {
+		no strict 'refs';
+		unshift(@args, $self);
+		if ($arrayctx) {
+			@result = @{[&{*{$function}}(@args)]};
+		}
+		else {
+			@result = (scalar &{*{$function}}(@args));
+		}
+	};
+	if ($@) {
+		$result[0] = "Error $@ during excecution of remote called function";
+		$logger->error($result[0]);
+	}
+	return @result;
+}
+
+
 sub process_command {
 	my ($self, $sock) = @_;
 	$logger->debug("Processing data from server.");
@@ -273,22 +311,8 @@ sub process_command {
 		$logger->debug("Running $function(@args) in "
 			. ($arrayctx?'list':'scalar') . ' context');
 
-		unshift(@args, $self);
-
-		my @result;
-		eval {
-			no strict 'refs';
-			if ($arrayctx) {
-				@result = @{[&{*{$function}}(@args)]};
-			}
-			else {
-				@result = (scalar &{*{$function}}(@args));
-			}
-		};
-		if ($@) {
-			$result[0] = "Error $@ during excecution of remote called function";
-			$logger->error($result[0]);
-		}
+		my @result = $self->_callFunction($function, $arrayctx, @args);
+		$logger->debug("Function result: @result");
 
 		$self->addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
@@ -299,19 +323,27 @@ sub process_command {
 	}
 }
 
-sub runOnSensor {
-	my ($self, $sensor, @what) = @_;
+
+sub runOnNode {
+	my ($self, $name, @what) = @_;
 	my @result;
 
-	return "No such sensor: $sensor"
-		unless exists($self->{'sensors'}{$sensor});
+	if ($name eq $self->{'name'}) {
+		no strict 'refs';
+		my ($function, $arrayctx, @args) = @what;
+		return $self->_callFunction($function, $arrayctx, @args);
+	}
 
-	my $socket = $self->{'sensors'}{$sensor}{'socket'};
+	return "No such node: $name"
+		unless exists($self->{'sensors'}{$name});
+
+	my $socket = $self->{'sensors'}{$name}{'socket'};
 	Sensor::sendToPeer($socket, @what);
 
 	# XXX tu by sie przydalo poprawic asynchronicznosc
 	return Sensor::recvFromPeer($socket);
 }
+
 
 1;
 

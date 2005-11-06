@@ -161,15 +161,5 @@ sub accept_client {
 }
 
 
-
-sub read_from_client {
-	my($self, $sock) = @_;
-	
-	if ($sock->peek(undef, 1) == 0) {
-		$self->removefh($sock, 'rw');
-		$logger->info("Sensor closed connection");
-	}
-}
-
 1;
 
