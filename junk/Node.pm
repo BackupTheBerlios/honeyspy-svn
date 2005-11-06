@@ -7,6 +7,7 @@ use IO::Select;
 use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
+use Storable ('thaw');
 use Carp;
 
 require Exporter;
@@ -40,19 +41,22 @@ sub new($) {
 		'socket' => \*STDOUT,
 		'mode' => 'sensor',
 
+		'admin_socket' => undef,
+		'admin_lsn_socket' => undef,
+
 		'abilites' => {},
 		'interfaces' => [],
 		'ports' => [],
+
+		# Handlery dla zdarzen na uchwytach plikow
+		'r_handlers' => {},
+		'w_handlers' => {},
+		'e_handlers' => {},
 
 		# Zbiory uchwytow plikow, ktore trzeba obserwowac
 		'r_set' => new IO::Select(),
 		'w_set' => new IO::Select(),
 		'e_set' => new IO::Select(),
-
-		# Handlery dla poszczegolnych uchwytow plikow
-		'r_handlers' => {},
-		'w_handlers' => {},
-		'e_handlers' => {},
 
       'stimeout' => 2,
       'reconnect' => 4, # tyle sekund miedzy reconnect
@@ -69,6 +73,11 @@ sub new($) {
 #
 sub getName() {
 	return shift->{'name'};
+}
+
+
+sub info {
+	$logger->debug("Jestem wezel ${\($_[0]->{name})}\n");
 }
 
 
@@ -108,8 +117,22 @@ sub sendToPeer {
 	print "wysylam\n";
 }
 
+
+sub _configure_master {
+   my ($self, $master) = @_;
+	
+	$self->addfh($master, 're');
+	$self->{'r_handlers'}{$master} = sub {
+		$self->process_command($master);
+	};
+
+	$self->{'connected'} = 1;
+	$self->{'master_sock'} = $master;
+}
+
+
 sub _connect_to_master {
-   my($self) = @_;
+   my ($self) = @_;
 	my $master;
 
 	$logger->debug("Connecting to 127.0.0.1:9000...");
@@ -149,11 +172,7 @@ sub _connect_to_master {
 	$logger->info("Certificate recognized.");
 	$logger->debug("Using cipher: $cipher");
 
-	$self->addfh($master, 're');
-	$self->{'r_handlers'}{$master} = \&process_command;
-
-	$self->{'connected'} = 1;
-	$self->{'master_sock'} = $master;
+	$self->_configure_master($master);
 }
 
 
@@ -219,44 +238,16 @@ sub run {
 		}
 
 		foreach my $fh (@$r_ready) {
-			$logger->debug("Something in read ready set");
+			$logger->debug("Something ($fh) in read ready set");
 
-			if ($self->{'mode'} eq 'master') {
-				if (exists($self->{'sensors'}{$fh})) {
-					$self->{'sensors'}{$fh}->read();
-				}
-				elsif ($fh == $self->{'listen_sock'}) {
-					$self->accept_client();
-				}
-				else {
-					confess "Unknown filehandle in a set";
-				}
-			}
-			else { # Sensor mode
-				confess "Master socket should be the only filehandle here"
-					unless $fh == $self->{'master_sock'};
-				$self->process_command($fh);
-			}
-
-			next;
-			&{$self->{'r_handlers'}{$fh}}($self, $fh)
-				if (exists($self->{'r_handlers'}{$fh}));
+			$self->{'r_handlers'}{$fh}()
+				if exists($self->{'r_handlers'}{$fh});
 		}
 		foreach my $fh (@$w_ready) {
-			$logger->debug("Something in write ready set");
-			if (exists($self->{'sensors'}{$fh})) {
-				$logger->debug($fh);
-				$self->{'sensors'}{$fh}->write();
-			}
-			elsif ($self->{'mode'} eq 'master' && $fh == $self->{'listen_sock'}) {
-				# NOT REACHABLE (?)
-				$self->accept_client();
-			}
-			$logger->debug($fh);
+			$logger->debug("Something ($fh) in write ready set");
 
-			next;
-			&{$self->{'w_handlers'}{$fh}}($self, $fh)
-				if (exists($self->{'w_handlers'}{$fh}));
+			$self->{'w_handlers'}{$fh}()
+				if exists($self->{'w_handlers'}{$fh});
 		}
 	}
 }
@@ -272,9 +263,54 @@ sub process_command {
 		close($sock);
 	}
 	else {
-		my $msg = <$sock>;
-		$logger->debug("Server send me: $msg");
+		my $buf;
+		sysread($sock, $buf, 4);
+		my $len = unpack('N', $buf);
+		sysread($sock, $buf, $len);
+		my ($function, $arrayctx, @args) = @{thaw($buf)};
+
+		local $" = ',';
+		$logger->debug("Running $function(@args) in "
+			. ($arrayctx?'list':'scalar') . ' context');
+
+		unshift(@args, $self);
+
+		my @result;
+		eval {
+			no strict 'refs';
+			if ($arrayctx) {
+				@result = @{[&{*{$function}}(@args)]};
+			}
+			else {
+				@result = (scalar &{*{$function}}(@args));
+			}
+		};
+		if ($@) {
+			$result[0] = "Error $@ during excecution of remote called function";
+			$logger->error($result[0]);
+		}
+
+		$self->addfh($sock, 'w');
+		$self->{'w_handlers'}{$sock} = sub {
+			Sensor::sendToPeer($sock, @result);
+			$self->removefh($sock, 'w');
+		};
+
 	}
+}
+
+sub runOnSensor {
+	my ($self, $sensor, @what) = @_;
+	my @result;
+
+	return "No such sensor: $sensor"
+		unless exists($self->{'sensors'}{$sensor});
+
+	my $socket = $self->{'sensors'}{$sensor}{'socket'};
+	Sensor::sendToPeer($socket, @what);
+
+	# XXX tu by sie przydalo poprawic asynchronicznosc
+	return Sensor::recvFromPeer($socket);
 }
 
 1;

@@ -4,7 +4,7 @@ package Sensor;
 
 use Log::Log4perl (':easy');
 
-use Storable qw(nstore_fd freeze);
+use Storable qw(freeze thaw);
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -67,7 +67,7 @@ sub read {
 
 	if ($sock->peek(undef, 1) == 0) {
 		$logger->info("Sensor closed connection");
-		$self->{'master'}->removefh($sock, 'rwe');
+		$self->{'master'}->remove_sensor($self);
 	}
 }
 
@@ -79,8 +79,17 @@ sub write {
 	my ($sock) = $self->{'socket'};
 	$logger->debug("Writing data to sensor");
 
-	print $sock "Hello, my dear client.\n";
-	$self->{'master'}->remove_sensor($self);
+#	print $sock "Hello, my dear client.\n";
+
+	Sensor::sendToPeer($sock, 'info', 0);
+	$self->{'master'}{'r_handlers'}{$sock} = sub {
+		my $res = Sensor::recvFromPeer($sock);
+		$logger->info("Sensor replied: $res");
+		$self->{'master'}->removefh($sock, 'w');
+	};
+
+	$self->{'master'}->removefh($self->{'socket'}, 'w');
+#	$self->{'master'}->remove_sensor($self);
 }
 
 
@@ -121,6 +130,19 @@ sub sendToPeer {
 	print "wysylam\n";
 }
 
+sub recvFromPeer {
+	my ($sock) = @_;
+	my $buf;
+
+	sysread($sock, $buf, 4);
+	my $len = unpack('N', $buf);
+	sysread($sock, $buf, $len);
+	my @resp = @{thaw($buf)};
+	$logger->debug("Odpowiedz sensora:\n");
+	local $" = "\n->";
+	$logger->debug("@resp\n");
+	return @resp;
+}
 
 1;
 

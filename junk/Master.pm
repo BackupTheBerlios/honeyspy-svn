@@ -39,10 +39,6 @@ sub new($) {
 	return $self;
 }
 
-sub info() {
-	$logger->debug("Jestem master ${\($_[0]->{name})}\n");
-}
-
 #
 # XXX
 # Akcesory i modifykatory powinny byæ robione automatycznie
@@ -53,7 +49,7 @@ sub getName() {
 }
 
 sub DESTROY {
-	$logger->debug("Destruktor Mastera ${\($_[0]->{'name'})}\n");
+#	$logger->debug("Destruktor Mastera\n");
 }
 
 
@@ -81,13 +77,16 @@ sub run {
 	}
 	$self->{'listen_sock'} = $listen_sock;
 	$self->addfh($listen_sock, 'r');
-	$self->{'r_handlers'}{$listen_sock} = \&accept_client;
 
 	$SIG{INT} = sub {
 		$logger->info("Caught SIGINT.");
 		close $listen_sock;
 		$logger->info("Closed main socket.");
 		exit(0);
+	};
+
+	$self->{'r_handlers'}{$listen_sock} = sub {
+		$self->accept_client();
 	};
 
 	# Glowna petla wezla sieci
@@ -114,8 +113,8 @@ sub remove_sensor {
 sub accept_client {
 	my ($self) = @_;
 
-	$logger->info("Client connected.");
 	my $socket = $self->{'listen_sock'}->accept();
+	$logger->info("Client connected from " . $socket->peerhost);
 
 	my $authorized = 0;
 	my ($subject_name, $issuer_name);
@@ -129,25 +128,36 @@ sub accept_client {
 		return;
 	}
 
-	my $sensor_name = $subject_name;
-	for ($sensor_name) {
+	my $client_name = $subject_name;
+	for ($client_name) {
 		s'.*CN='';
 		s'/.*'';
 	}
 
-	$logger->info("Sensor $sensor_name joined the network");
+	if ($client_name eq 'admin') {
+		$logger->info("Administrator connected from " . $socket->peerhost);
+		$self->_configure_master($socket);
+		return;
+	}
+
+	$logger->info("Sensor $client_name joined the network");
 
 	my $sensor = new Sensor({
-			name => $sensor_name,
+			name => $client_name,
 			socket => $socket,
 			master => $self,
 		});
-	$self->{'sensors'}{$sensor_name} = $sensor;
+	$self->{'sensors'}{$client_name} = $sensor;
 	$self->{'sensors'}{$socket} = $sensor;
 
+	$self->{'w_handlers'}{$socket} = sub {
+		$sensor->write();
+	};
+	$self->{'r_handlers'}{$socket} = sub {
+		$sensor->read();
+	};
+	$logger->debug("Added $socket to select sets");
 	$self->addfh($socket, 'rw');
-	$self->{'w_handlers'}{$socket} = \&serve_client;
-	$self->{'r_handlers'}{$socket} = \&read_from_client;
 }
 
 
