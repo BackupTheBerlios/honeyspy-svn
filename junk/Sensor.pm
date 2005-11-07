@@ -119,6 +119,12 @@ sub DESTROY {
 }
 
 
+#
+# XXX
+# sendToPeer i recvFromPeer powinny w zasadzie nie byæ
+# metodami statycznymi
+#
+
 sub sendToPeer {
 	my ($sock, $serialized) = (shift, freeze [@_]);
 	print $sock pack('N', length($serialized));

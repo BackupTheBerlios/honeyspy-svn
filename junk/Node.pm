@@ -44,9 +44,6 @@ sub new($) {
 		'socket' => \*STDOUT,
 		'mode' => 'sensor',
 
-		'admin_socket' => undef,
-		'admin_lsn_socket' => undef,
-
 		'abilites' => {},
 		'interfaces' => [],
 		'ports' => [],
@@ -80,6 +77,10 @@ sub getName() {
 }
 
 
+#
+# Pobranie listy sensorów podleg³ych temu wêz³owi
+# (czyli ³±cznie z nim samym)
+#
 sub getSensors() {
 	my ($self) = @_;
 	my @names = $self->{'name'};
@@ -135,6 +136,9 @@ sub delMAC {
 }
 
 
+#
+# Przypisanie us³ugi na danym porcie
+#
 sub addService {
 	my ($self, $addr, $proto, $port, $script, @args) = @_;
 	$logger->info("Adding service on $addr:$port ($proto)");
