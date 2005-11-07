@@ -186,11 +186,11 @@ sub delService {
 }
 
 
+# XXX
 sub sendToPeer {
 	my ($sock, $serialized) = (shift, freeze [@_]);
 	print $sock pack('N', length($serialized));
 	print $sock $serialized;
-	print "wysylam\n";
 }
 
 
@@ -375,7 +375,16 @@ sub process_command {
 		sysread($sock, $buf, 4);
 		my $len = unpack('N', $buf);
 		sysread($sock, $buf, $len);
-		my ($function, $arrayctx, @args) = @{thaw($buf)};
+		my ($function, $arrayctx, @args);
+		eval {
+			($function, $arrayctx, @args) = @{thaw($buf)};
+		};
+		for ($@) {
+			if (/Magic number checking on storable string failed/) {
+				$logger->error("Wrong data received from client.");
+				return;
+			}
+		}
 
 		local $" = ',';
 		$logger->debug("Running $function(@args) in "
@@ -386,7 +395,7 @@ sub process_command {
 
 		$self->addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
-			Sensor::sendToPeer($sock, @result);
+			sendToPeer($sock, @result);
 			$self->removefh($sock, 'w');
 		};
 
@@ -406,11 +415,12 @@ sub runOnNode {
 	return "No such node: $name"
 		unless exists($self->{'sensors'}{$name});
 
-	my $socket = $self->{'sensors'}{$name}{'socket'};
-	Sensor::sendToPeer($socket, $function, wantarray, @args);
+#	my $socket = $self->{'sensors'}{$name}{'socket'};
+	my $sensor = $self->{'sensors'}{$name};
+	$sensor->sendToPeer($function, wantarray, @args);
 
 	# XXX tu by sie przydalo poprawic asynchronicznosc
-	return Sensor::recvFromPeer($socket);
+	return $sensor->recvFromPeer();
 }
 
 

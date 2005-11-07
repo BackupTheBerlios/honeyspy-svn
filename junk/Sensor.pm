@@ -5,11 +5,12 @@ package Sensor;
 use Log::Log4perl (':easy');
 
 use Storable qw(freeze thaw);
+use Node;
 
 require Exporter;
 @ISA = qw(Exporter);
 # (nie wolno eksportowac metod)
-@EXPORT = qw(sendToPeer recvFromPeer);
+# @EXPORT = qw(sendToPeer recvFromPeer);
 
 my $logger = get_logger();
 
@@ -81,10 +82,10 @@ sub write {
 	my ($sock) = $self->{'socket'};
 	$logger->debug("Writing data to sensor");
 
-	Sensor::sendToPeer($sock, 'info', 0);
+	$self->sendToPeer('info', 0);
 	$self->{'master'}{'r_handlers'}{$sock} = sub {
 		if ($self->read) {
-			my $res = Sensor::recvFromPeer($sock);
+			my $res = $self->recvFromPeer();
 			$logger->info("Sensor replied: $res");
 			$self->{'master'}->removefh($sock, 'w');
 		}
@@ -102,6 +103,7 @@ sub AUTOLOAD {
 
 
 #
+# XXX
 # Wywo³uje zdalnie na tym sensorze podan± funkcjê
 #
 sub call {
@@ -111,7 +113,8 @@ sub call {
 	$logger->debug("Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
 		. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
 
-	sendToPeer($self->{socket}, $name, $arrayctx, @args);
+	$self->sendToPeer($name, $arrayctx, @args);
+#	sendToPeer($self->{socket}, $name, $arrayctx, @args);
 }
 
 sub DESTROY {
@@ -126,13 +129,18 @@ sub DESTROY {
 #
 
 sub sendToPeer {
-	my ($sock, $serialized) = (shift, freeze [@_]);
-	print $sock pack('N', length($serialized));
-	print $sock $serialized;
+	my ($self) = shift;
+	my $sock = $self->{'socket'};
+
+	return Node::sendToPeer($sock, @_);
+
+#	print $sock pack('N', length($serialized));
+#	print $sock $serialized;
 }
 
 sub recvFromPeer {
-	my ($sock) = @_;
+	my ($self) = @_;
+	my $sock = $self->{'socket'};
 	my $buf;
 
 	sysread($sock, $buf, 4);

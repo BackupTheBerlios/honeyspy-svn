@@ -20,7 +20,7 @@ my $master = IO::Socket::SSL->new( PeerAddr => $ARGV[0],
 	Proto    => 'tcp',
 	SSL_use_cert => 1,
 
-	SSL_key_file => '../certs/admin-key.pem',
+	SSL_key_file => '../certs/admin-key.enc',
 	SSL_cert_file => '../certs/admin-cert.pem',
 	SSL_ca_file => '../certs/master-cert.pem',
 
@@ -42,6 +42,11 @@ print "\nConnection established\n";
 my $prompt = '> ';
 my $term = new Term::ReadLine 'HoneySpy console';
 
+my $s = new Sensor({
+	name => 'main',
+	socket => $master,
+});
+
 print $prompt;
 while (defined($_ = $term->readline($prompt))) {
 	$term->addhistory($_) if /\S/;
@@ -50,8 +55,11 @@ while (defined($_ = $term->readline($prompt))) {
 		($cmd, @args) = ($1, split(/\s/, $2));
 	}
 
-	Sensor::sendToPeer($master, $cmd, 1, @args);
-	my @res = Sensor::recvFromPeer($master);
+	$s->sendToPeer($cmd, 1, @args);
+	my @res = $s->recvFromPeer();
+
+#	Sensor::sendToPeer($master, $cmd, 1, @args);
+#	my @res = Sensor::recvFromPeer($master);
 
 	print $prompt;
 }
