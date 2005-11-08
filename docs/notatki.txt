@@ -1,4 +1,14 @@
 
+
+czemu gdzie poza recvFromPeer pojawia siê u nas thaw jeszcze?
+
+chyba gdy nie mozna polaczyc sie z masterem, to nie powinno sie
+zwlekac z wejsciem do glownej petli.
+
+
+
+
+
 my-ca.pem to certifykat CA, je¶li chcemy sprawdzic, czy druga strona ma certyfikat
 podpisany przez tego CA
 

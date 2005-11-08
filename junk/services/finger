@@ -8,7 +8,6 @@ chomp $username;
 print <<EOF;
 
 Welcome to Linux version 2.6.12-gentoo-r10 at serwer.honeyspy !
-
  12:53:22 up  1:48, 10 users,  load average: 0.20, 0.10, 0.08
 
 EOF
@@ -19,16 +18,7 @@ Directory: /home/$username                    Shell: /bin/bash
 On since Sun Nov  6 11:05 (CET) on tty1    1 hour 47 minutes idle
      (messages off)
 On since Sun Nov  6 12:30 (CET) on pts/0   4 minutes 50 seconds idle
-On since Sun Nov  6 11:09 (CET) on pts/1   4 minutes 38 seconds idle
-On since Sun Nov  6 12:30 (CET) on pts/2   6 minutes 11 seconds idle
-On since Sun Nov  6 11:35 (CET) on pts/3   1 minute 50 seconds idle
-On since Sun Nov  6 12:30 (CET) on pts/4   2 minutes 52 seconds idle
-On since Sun Nov  6 12:31 (CET) on pts/5   5 minutes 32 seconds idle
-On since Sun Nov  6 12:50 (CET) on pts/6   2 minutes 19 seconds idle
-On since Sun Nov  6 12:52 (CET) on pts/7   6 seconds idle
-On since Sun Nov  6 12:53 (CET) on pts/8
 No mail.
-No Plan.
 EOF
 
 

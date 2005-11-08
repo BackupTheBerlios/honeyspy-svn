@@ -8,6 +8,7 @@ use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
 use IO::Socket::INET;
+use Net::Pcap;
 use Storable ('thaw');
 use POSIX qw(setsid);
 use Carp;
@@ -35,7 +36,7 @@ our $CORRECT_CERT;
 # 	lista uchwytów plików: gotowych do odczytu, zapisu, wyj±tku
 #
 
-sub new($) {
+sub new {
 	$logger->debug("konstruktor Node\n");
 
 	my $class = ref($_[0]) || $_[0];
@@ -44,9 +45,20 @@ sub new($) {
 		'socket' => \*STDOUT,
 		'mode' => 'sensor',
 
-		'abilites' => {},
+		# Atrybuty dzialania serwera
+		'abilites' => {
+			'p0f' => undef,         # rozpoznawanie zdalnego os
+			'fingerprint' => undef, # falszowanie stosu
+			'mac' => undef,         # falszowanie adresow mac
+			'pcap' => undef,        # nasluchiwanie pakietow
+		},
 		'interfaces' => [],
 		'ports' => [],
+
+		# Interfejs nasluchiwania (PCAP)
+		'pcap' => undef,
+		'pcap_filters' => [],
+		'compiled_filter' => undef,
 
 		# Handlery dla zdarzen na uchwytach plikow
 		'r_handlers' => {},
@@ -62,7 +74,54 @@ sub new($) {
       'reconnect' => 4, # tyle sekund miedzy reconnect
       'connected' => 0
 	};
+
+	$self->_checkAbilities();
+
+	$self->_setupPcap() if ($self->{'abilites'}{'pcap'});
+
 	return bless $self, $class;
+}
+
+
+#
+# XXX Do polepszenia (jest wstepna prosta wersja)
+#
+sub _checkAbilities {
+	my ($self) = @_;
+	$logger->debug("Checking my abilities...");
+	
+	$self->{'abilites'}{'p0f'} = 0;
+	$self->{'abilites'}{'fingerprint'} = 0;
+	$self->{'abilites'}{'pcap'} = 0;
+	$self->{'abilites'}{'mac'} = 0;
+
+	# p0f
+	eval {
+		require Net::P0f;
+	};
+	$self->{'abilites'}{'p0f'} = 1 if ! $@;
+
+	# fingerprint
+	$self->{'abilites'}{'fingerprint'} = 1 if ! $>;
+
+	# pcap
+	my $err;
+	Net::Pcap::lookupdev(\$err);
+	$self->{'abilites'}{'pcap'} = 1 if (! $err);
+
+	# mac
+	my ($ebtables, $arptables);
+	foreach (split(/:/, $ENV{'PATH'})) {
+		$ebtables = 1 if -x "$_/ebtables";
+		$arptables = 1 if -x "$_/arptables";
+		last if $ebtables && $arptables;
+	}
+	$self->{'abilites'}{'mac'} if $ebtables && $arptables;
+
+	my @abilities = grep {$self->{'abilites'}{$_}} keys %{$self->{'abilites'}};
+	local $" = ',';
+	no warnings;
+	$logger->debug("My abilities are: @abilities");
 }
 
 
@@ -115,6 +174,9 @@ sub kill {
 	return 0;
 }
 
+#
+# Zmiana charakterystyki stosu TCP/IP
+#
 sub setFingerprint {
 	my ($addr, $os) = @_;
 	$logger->info("Setting $os fingerprint on $addr");
@@ -125,6 +187,10 @@ sub delFingerprint {
 	$logger->info("Disabling fingerprint mangling on $addr");
 }
 
+
+#
+# Falszowanie adresow MAC
+#
 sub setMAC {
 	my ($addr, $mac) = @_;
 	$logger->info("Setting $mac address on $addr");
@@ -134,6 +200,84 @@ sub delMAC {
 	my ($addr) = @_;
 	$logger->info("Disabling MAC mangling on $addr");
 }
+
+
+#
+# Nasluchiwanie ruchu sieciowego (PCAP)
+#
+sub addFilter {
+	my ($self, $new_filter) = @_;
+
+	push @{$self->{'pcap_filters'}}, $new_filter;
+	$self->_compileFilter();
+}
+
+sub replaceFilters {
+	my ($self, $new_filter) = @_;
+	
+	$self->{'pcap_filters'} = [$new_filter];
+	$self->_compileFilter();
+}
+
+sub delFilter {
+	my ($self, $number) = @_;
+
+}
+
+sub getFilters {
+	my ($self) = @_;
+	
+	return @{$self->{'pcap_filters'}};
+}
+
+sub getFilter {
+	my ($self, $number) = @_;
+	
+	return $self->{'pcap_filters'}[$number];
+}
+
+sub _compileFilter {
+	my ($self) = @_;
+	my $compiled;
+
+	# sprawdzic kazda regule po kolei
+	foreach ($self->{'pcap_filters'}) {
+		my $err = Net::Pcap::compile($self->{'pcap'}, \$compiled, $_, 1, 0);
+		if ($err) {
+			$err = "Error in rule: $_";
+			$logger->error($err);
+			return $err;
+		}
+	}
+
+	# zrobic alternatywe logiczna wszystkich regul
+	my $sum = '0==1';
+	$sum = "($sum) or $_" foreach ($self->{'pcap_filters'});
+	my $err = Net::Pcap::compile($self->{'pcap'}, \$compiled, $_, 1, 0);
+	if ($err) {
+		$err = "Error in rules sum: $_";
+		$logger->error($err);
+		return $err;
+	}
+
+	Net::Pcap::setfilter($self->{'pcap'}, $compiled);
+
+	return 0;
+}
+
+sub _setupPcap {
+	my ($self) = @_;
+	my $err;
+	
+	$self->{'pcap'} =
+		Net::Pcap::open_live('any', 512, 1, 0, \$err);
+	$logger->error($err) if $err;
+
+	$self->_compileFilter;
+}
+
+
+
 
 
 #
