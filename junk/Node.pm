@@ -8,6 +8,9 @@ use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
 use IO::Socket::INET;
+use NetPacket::IP;
+use NetPacket::Ethernet qw(:strip);
+use NetPacket::Ethernet;
 use Net::Pcap;
 use Storable ('thaw');
 use POSIX qw(setsid);
@@ -46,7 +49,7 @@ sub new {
 		'mode' => 'sensor',
 
 		# Atrybuty dzialania serwera
-		'abilites' => {
+		'abilities' => {
 			'p0f' => undef,         # rozpoznawanie zdalnego os
 			'fingerprint' => undef, # falszowanie stosu
 			'mac' => undef,         # falszowanie adresow mac
@@ -75,11 +78,13 @@ sub new {
       'connected' => 0
 	};
 
+	bless $self, $class;
+
 	$self->_checkAbilities();
 
-	$self->_setupPcap() if ($self->{'abilites'}{'pcap'});
+	$self->_setupPcap() if ($self->{'abilities'}{'pcap'});
 
-	return bless $self, $class;
+	return $self;
 }
 
 
@@ -90,24 +95,24 @@ sub _checkAbilities {
 	my ($self) = @_;
 	$logger->debug("Checking my abilities...");
 	
-	$self->{'abilites'}{'p0f'} = 0;
-	$self->{'abilites'}{'fingerprint'} = 0;
-	$self->{'abilites'}{'pcap'} = 0;
-	$self->{'abilites'}{'mac'} = 0;
+	$self->{'abilities'}{'p0f'} = 0;
+	$self->{'abilities'}{'fingerprint'} = 0;
+	$self->{'abilities'}{'pcap'} = 0;
+	$self->{'abilities'}{'mac'} = 0;
 
 	# p0f
 	eval {
 		require Net::P0f;
 	};
-	$self->{'abilites'}{'p0f'} = 1 if ! $@;
+	$self->{'abilities'}{'p0f'} = 1 if ! $@;
 
 	# fingerprint
-	$self->{'abilites'}{'fingerprint'} = 1 if ! $>;
+	$self->{'abilities'}{'fingerprint'} = 1 if ! $>;
 
 	# pcap
 	my $err;
 	Net::Pcap::lookupdev(\$err);
-	$self->{'abilites'}{'pcap'} = 1 if (! $err);
+	$self->{'abilities'}{'pcap'} = 1 if (! $err);
 
 	# mac
 	my ($ebtables, $arptables);
@@ -116,12 +121,19 @@ sub _checkAbilities {
 		$arptables = 1 if -x "$_/arptables";
 		last if $ebtables && $arptables;
 	}
-	$self->{'abilites'}{'mac'} if $ebtables && $arptables;
+	$self->{'abilities'}{'mac'} = 1 if $ebtables && $arptables;
 
-	my @abilities = grep {$self->{'abilites'}{$_}} keys %{$self->{'abilites'}};
+	my @abilities = grep {$self->{'abilities'}{$_}} keys %{$self->{'abilities'}};
 	local $" = ',';
 	no warnings;
 	$logger->debug("My abilities are: @abilities");
+}
+
+
+sub getAbilities {
+	my ($self) = @_;
+
+	return %{$self->{'abilities'}};
 }
 
 
@@ -207,6 +219,7 @@ sub delMAC {
 #
 sub addFilter {
 	my ($self, $new_filter) = @_;
+	$logger->debug("Adding filter: $new_filter");
 
 	push @{$self->{'pcap_filters'}}, $new_filter;
 	$self->_compileFilter();
@@ -240,8 +253,10 @@ sub _compileFilter {
 	my ($self) = @_;
 	my $compiled;
 
+	return unless @{$self->{'pcap_filters'}};
+
 	# sprawdzic kazda regule po kolei
-	foreach ($self->{'pcap_filters'}) {
+	foreach (@{$self->{'pcap_filters'}}) {
 		my $err = Net::Pcap::compile($self->{'pcap'}, \$compiled, $_, 1, 0);
 		if ($err) {
 			$err = "Error in rule: $_";
@@ -250,14 +265,18 @@ sub _compileFilter {
 		}
 	}
 
-	# zrobic alternatywe logiczna wszystkich regul
-	my $sum = '0==1';
-	$sum = "($sum) or $_" foreach ($self->{'pcap_filters'});
-	my $err = Net::Pcap::compile($self->{'pcap'}, \$compiled, $_, 1, 0);
-	if ($err) {
-		$err = "Error in rules sum: $_";
-		$logger->error($err);
-		return $err;
+	if (@{$self->{'pcap_filters'}} > 1) {
+		# zrobic alternatywe logiczna wszystkich regul
+		my @filters = @{$self->{'pcap_filters'}};
+		my $sum = $filters[0];
+		$sum = "($sum) or ($_)" foreach @filters[1..$#filters];
+		my $err = '';
+		$err = Net::Pcap::compile($self->{'pcap'}, \$compiled, $sum, 1, 0);
+		if ($err) {
+			$err = "Error in rules sum: $sum. " . Net::Pcap::geterr($self->{'pcap'});
+			$logger->error($err);
+			return $err;
+		}
 	}
 
 	Net::Pcap::setfilter($self->{'pcap'}, $compiled);
@@ -270,13 +289,72 @@ sub _setupPcap {
 	my $err;
 	
 	$self->{'pcap'} =
-		Net::Pcap::open_live('any', 512, 1, 0, \$err);
+		Net::Pcap::open_live('any', 51200, 1, 0, \$err);
 	$logger->error($err) if $err;
 
-	$self->_compileFilter;
+	$logger->debug("pcap datalink: " . Net::Pcap::datalink($self->{'pcap'}));
+
+	$self->_compileFilter();
+}
+
+sub enablePcap {
+	my ($self) = @_;
+
+	if (!$self->{'pcap'}) {
+		my $err = "Pcap not supported";
+		$logger->error($err);
+		return $err;
+	}
+	
+	
+	my $fd = Net::Pcap::fileno($self->{'pcap'});
+	$self->{'r_set'}->add($fd);
+	$self->{'r_handlers'}{$fd} = sub {
+		$logger->debug("Got packet");
+		Net::Pcap::loop($self->{'pcap'}, 1, \&_pcapPacket, 'aaa');
+	};
+
+	return 0;
+}
+
+sub callback {
+   local $" = "\n";
+   print "--\n";
+   print "$_[0]\n";
+   my %hdr = %{$_[1]};
+   foreach (keys %hdr) {
+      print "$_ => $hdr{$_}\n";
+   }
+   print "--\n";
+   my $ip_obj = NetPacket::IP->decode(eth_strip($_[2]));
+   print "src ip: " . $ip_obj->{'src_ip'} . "\n";
+   print "dst ip: " . $ip_obj->{'dest_ip'} . "\n";
+   print "\n";
 }
 
 
+sub _pcapPacket {
+	my ($user_data, $hdr, $pkt) = @_;
+
+	my $eth_obj = NetPacket::Ethernet->decode($pkt);
+	my $msg = "Packet matched PCAP rule.";
+	$msg .= " src mac: " . $eth_obj->{'src_mac'};
+	$msg .= " dst mac: " . $eth_obj->{'dst_mac'}
+		if defined($eth_obj->{'dst_mac'});
+
+	#my $ip_obj = NetPacket::IP->decode(eth_strip($pkt));
+	my $ip_obj = NetPacket::IP->decode($eth_obj->{'data'});
+	$msg .= " | ";
+	$msg .= 'src:' . $ip_obj->{'src_ip'};
+	$msg .= ' dst:' . $ip_obj->{'dest_ip'};
+	$msg .= ' ipver:' . $ip_obj->{'ver'};
+	$msg .= ' tos:' . $ip_obj->{'tos'};
+	$msg .= ' len:' . $ip_obj->{'len'};
+	$msg .= ' id:' . $ip_obj->{'id'};
+	$msg .= ' proto:' . $ip_obj->{'proto'};
+	$msg .= ' flags:' . $ip_obj->{'flags'};
+	$logger->info($msg);
+}
 
 
 
@@ -423,6 +501,7 @@ sub run {
 	my $self = shift;
 	$logger->info("Starting node " . $self->{'name'});
 
+	# XXX
 	if ($self->{'mode'} eq 'sensor') {
 		while (!($self->_connect_to_master())) {
 			my $delay = $self->{'reconnect'};
@@ -539,7 +618,7 @@ sub process_command {
 
 		$self->addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
-			sendToPeer($sock, @result);
+			sendToPeer($sock, @result); # XXX
 			$self->removefh($sock, 'w');
 		};
 

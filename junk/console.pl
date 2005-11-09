@@ -50,9 +50,9 @@ my $s = new Sensor({
 print $prompt;
 while (defined($_ = $term->readline($prompt))) {
 	$term->addhistory($_) if /\S/;
-	my ($cmd, @args) = ($_);
+	my ($cmd, $args, @args) = ($_);
 	if (/^(.*?)\s(.*)/) {
-		($cmd, @args) = ($1, split(/\s/, $2));
+		($cmd, @args) = ($1, split(/\s*,\s*/, $2));
 	}
 
 	$s->sendToPeer($cmd, 1, @args);

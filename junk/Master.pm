@@ -114,6 +114,7 @@ sub accept_client {
 	my ($self) = @_;
 
 	my $socket = $self->{'listen_sock'}->accept();
+	return unless $socket;
 	$logger->info("Client connected from " . $socket->peerhost);
 
 	my $authorized = 0;
