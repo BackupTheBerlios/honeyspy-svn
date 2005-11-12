@@ -10,17 +10,19 @@ use IO::Select;
 
 sub callback {
 	local $" = "\n";
-	print "--\n";
 	print "$_[0]\n";
 	my %hdr = %{$_[1]};
 	foreach (keys %hdr) {
 		print "$_ => $hdr{$_}\n";
 	}
-	print "--\n";
-	my $ip_obj = NetPacket::IP->decode(eth_strip($_[2]));
+	my $eth_obj = NetPacket::Ethernet->decode($_[2]);
+	print "src eth: " . $eth_obj->{'src_mac'} . "\n";
+	my $data = $eth_obj->{'data'};
+	$data =~ s/^..//;
+	my $ip_obj = NetPacket::IP->decode($data);
 	print "src ip: " . $ip_obj->{'src_ip'} . "\n";
 	print "dst ip: " . $ip_obj->{'dest_ip'} . "\n";
-	print "\n";
+	print "--\n";
 }
 
 my $err;
@@ -39,7 +41,7 @@ else {
 }
 
 my $fno = Net::Pcap::fileno($pcap);
-my $filter = 'icmp';
+my $filter = '';
 my $filter2;
 Net::Pcap::compile($pcap, \$filter2, $filter, 1, '16') or print "filter compiled\n";
 Net::Pcap::setfilter($pcap, $filter2);

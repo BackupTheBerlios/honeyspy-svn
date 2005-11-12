@@ -317,21 +317,6 @@ sub enablePcap {
 	return 0;
 }
 
-sub callback {
-   local $" = "\n";
-   print "--\n";
-   print "$_[0]\n";
-   my %hdr = %{$_[1]};
-   foreach (keys %hdr) {
-      print "$_ => $hdr{$_}\n";
-   }
-   print "--\n";
-   my $ip_obj = NetPacket::IP->decode(eth_strip($_[2]));
-   print "src ip: " . $ip_obj->{'src_ip'} . "\n";
-   print "dst ip: " . $ip_obj->{'dest_ip'} . "\n";
-   print "\n";
-}
-
 
 sub _pcapPacket {
 	my ($user_data, $hdr, $pkt) = @_;
@@ -343,7 +328,7 @@ sub _pcapPacket {
 		if defined($eth_obj->{'dst_mac'});
 
 	#my $ip_obj = NetPacket::IP->decode(eth_strip($pkt));
-	my $ip_obj = NetPacket::IP->decode($eth_obj->{'data'});
+	my $ip_obj = NetPacket::IP->decode(substr($eth_obj->{'data'}, 2));
 	$msg .= " | ";
 	$msg .= 'src:' . $ip_obj->{'src_ip'};
 	$msg .= ' dst:' . $ip_obj->{'dest_ip'};
