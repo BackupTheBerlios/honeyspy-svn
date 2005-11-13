@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 
 package Node;
 
@@ -63,6 +63,12 @@ sub new {
 		'pcap_filters' => [],
 		'compiled_filter' => undef,
 
+		# przypisane przez honeypota ip aliasy
+		'ip_aliases' = {},
+
+		# spoofowane adresy mac
+		'spoofed_mac' => {},
+
 		# Handlery dla zdarzen na uchwytach plikow
 		'r_handlers' => {},
 		'w_handlers' => {},
@@ -111,17 +117,18 @@ sub _checkAbilities {
 
 	# pcap
 	my $err;
-	Net::Pcap::lookupdev(\$err);
+	Net::Pcap::open_live('any', 512, 1, 0, \$err);
 	$self->{'abilities'}{'pcap'} = 1 if (! $err);
 
 	# mac
-	my ($ebtables, $arptables);
+	my ($ebtables, $arptables, $ifconfig);
 	foreach (split(/:/, $ENV{'PATH'})) {
 		$ebtables = 1 if -x "$_/ebtables";
 		$arptables = 1 if -x "$_/arptables";
-		last if $ebtables && $arptables;
+		$ifconfig = 1 if -x "$_/ifconfig";
+		last if $ebtables && $arptables && $ifconfig;
 	}
-	$self->{'abilities'}{'mac'} = 1 if $ebtables && $arptables;
+	$self->{'abilities'}{'mac'} = 1 if $ebtables && $arptables && $ifconfig;
 
 	my @abilities = grep {$self->{'abilities'}{$_}} keys %{$self->{'abilities'}};
 	local $" = ',';
@@ -186,16 +193,48 @@ sub kill {
 	return 0;
 }
 
+
+#
+# Dodawanie/usuwanie aliasów IP
+#
+sub addIPAlias {
+	my ($self, $ip) = @_;
+
+	my $ifname = 'honey' . scalar $#{$self->{'ip_aliases'}};
+	$self->{'ip_aliases'}
+
+	system ("ifconfig honey:$n $ip") >> 8 == 0
+		or return "Couldn't assign $ip to honey:$n";
+}
+
+sub delIPAlias {
+	my ($self, $ip) = @_;
+
+	my $ifname = '';
+	foreach (qx/ifconfig -a/) {
+		last if $ifname && /inet addr:\s*($ip)\s/;
+		undef $ifname;
+		next unless /^(honey:\d+)/;
+		$ifname = $1;
+	}
+
+	$logger->info("Removing interface $ifname");
+
+	system("ifconfig $ifname down") >> 8 == 0
+		or return "Couldn't disable $ifname interface";
+}
+
+
 #
 # Zmiana charakterystyki stosu TCP/IP
 #
 sub setFingerprint {
-	my ($addr, $os) = @_;
+	my ($self, $addr, $os) = @_;
 	$logger->info("Setting $os fingerprint on $addr");
 }
 
 sub delFingerprint {
-	my ($addr) = @_;
+	my ($self, $addr) = @_;
 	$logger->info("Disabling fingerprint mangling on $addr");
 }
 
@@ -204,14 +243,74 @@ sub delFingerprint {
 # Falszowanie adresow MAC
 #
 sub setMAC {
-	my ($addr, $mac) = @_;
+	my ($self, $addr, $mac) = @_;
 	$logger->info("Setting $mac address on $addr");
+
+	$self->{'spoofed_mac'}{$addr} = $mac;
+	$self->_updateArpTables();
 }
 
 sub delMAC {
-	my ($addr) = @_;
+	my ($self, $addr) = @_;
 	$logger->info("Disabling MAC mangling on $addr");
+
+	delete $self->{'spoofed_mac'}{$addr};
+	return $self->_updateArpTables();
 }
+
+sub getMAC {
+	my ($self, $ip) = @_;
+
+	return $self->{'spoofed_mac'}{$ip} if defined $ip;
+	return %{$self->{'spoofed_mac'}};
+}
+
+# usuwa wszystkie odwzorowania adres -> mac
+sub cleanMAC {
+	my ($self) = @_;
+	
+	$self->{'spoofed_mac'} = {};
+	return $self->_updateArpTables();
+}
+
+sub _updateArpTables {
+	my ($self) = @_;
+
+	system('ebtables -t nat -F PREROUTING ; arptables -t mangle -F OUTPUT') >> 8 == 0
+		or return "Couldn't clean ebtables and arptables rules";
+
+#
+# XXX to powinno byc w metodach dodajacej/usuwajacej aliasy ip
+#
+#	my (@aliases) = ();
+#	foreach (qx/ifconfig -a/) {
+#		next unless /^(honey:\d+)/;
+#		push @aliases, $1;
+#	}
+#	foreach (@aliases) {
+#		system("ifconfig $_ down") >> 8 == 0
+#			or return "Couldn't disable $_ interface";
+#	}
+
+	my $n = 0;
+	while ((my ($ip, $mac) = each(%{$self->{'spoofed_mac'}}))) {
+
+		next unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
+		next unless $mac =~ /([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/;
+
+		system("arptables -t mangle -A OUTPUT --h-length 6 -o honey "
+		. "-s $ip -j mangle --mangle-mac-s $mac")
+			or return "Couldn't set arptables rule ($ip -> $mac)";
+
+		system("ebtables -t nat -A PREROUTING -d $mac -j redirect")
+			or return "Couldn't set ebtables rule (to redirect $mac)";
+
+		$n++;
+	}
+
+	return 0;
+}
+
 
 
 #
@@ -289,7 +388,7 @@ sub _setupPcap {
 	my $err;
 	
 	$self->{'pcap'} =
-		Net::Pcap::open_live('any', 51200, 1, 0, \$err);
+		Net::Pcap::open_live('any', 512, 1, 0, \$err);
 	$logger->error($err) if $err;
 
 	$logger->debug("pcap datalink: " . Net::Pcap::datalink($self->{'pcap'}));
