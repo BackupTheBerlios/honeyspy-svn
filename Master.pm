@@ -54,14 +54,14 @@ sub run {
 	my $listen_sock;
 	if(!($listen_sock = IO::Socket::SSL->new(
 				Listen => 5,
-				LocalAddr => 'localhost',
-				LocalPort => 9000,
+				LocalAddr => $self->{'listen_addr'},
+				LocalPort => $self->{'listen_port'},
 				Proto     => 'tcp',
 				Reuse     => 1,
 
-				SSL_key_file => '../certs/master-key.pem',
-				SSL_cert_file => '../certs/master-cert.pem',
-				SSL_ca_file => '../certs/master-cert.pem',
+				SSL_ca_file => $self->{'ca_file'},
+				SSL_key_file => $self->{'ssl_key'},
+				SSL_cert_file => $self->{'ssl_cert'},
 
 				SSL_verify_mode => 0x01,
 			)) ) {

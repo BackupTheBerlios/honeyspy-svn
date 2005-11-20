@@ -19,7 +19,6 @@ use Master;
 
 require Exporter;
 our @ISA = qw(Exporter);
-# (nie wolno eksportowac metod)
 
 my $logger = get_logger();
 
@@ -41,11 +40,13 @@ sub sendDataToSocket {
 # Konstruktor
 #
 sub new {
+	my ($class,  $config_file) = 
+		(ref($_[0]) || $_[0], $_[1]);
+
 	$logger->debug("konstruktor Node\n");
 
-	my $class = ref($_[0]) || $_[0];
 	my $self = {
-		'name' => $_[1],
+		'name' => 'unnamed',
 		'socket' => \*STDOUT,
 		'mode' => 'sensor',
 
@@ -87,10 +88,15 @@ sub new {
 
 	bless $self, $class;
 
-	$self->_checkAbilities();
-	$self->_initIPAliases();
+	$self->readConfig($config_file)
+		if defined $config_file;
 
-	$self->_setupPcap() if ($self->{'abilities'}{'pcap'});
+	$self->_checkAbilities();
+
+	$self->_initIPAliases()
+		if $self->{'abilities'}{'ipaliases'};
+	$self->_setupPcap()
+		if $self->{'abilities'}{'pcap'};
 
 	return $self;
 }
@@ -107,10 +113,14 @@ sub _checkAbilities {
 	my ($self) = @_;
 	$logger->debug("Checking my abilities...");
 	
+	$self->{'abilities'}{'ipaliases'} = 0;
 	$self->{'abilities'}{'p0f'} = 0;
 	$self->{'abilities'}{'fingerprint'} = 0;
 	$self->{'abilities'}{'pcap'} = 0;
 	$self->{'abilities'}{'mac'} = 0;
+
+	# IP Aliasy
+	$self->{'abilities'}{'ipaliases'} = 1 if ! $>;
 
 	# p0f
 	eval {
@@ -151,7 +161,6 @@ sub _initIPAliases {
 			$ifname = $1;
 		}
 		elsif ($ifname && /inet addr:(\S+)\s/) {
-			print "$1 -> $ifname\n";
 			$self->{'ip_aliases'}{$1} = $ifname;
 			undef $ifname;
 		}
@@ -302,14 +311,16 @@ sub _connect_to_master {
 	my $master;
 
 	$logger->debug("Connecting to 127.0.0.1:9000...");
-	$master = IO::Socket::SSL->new( PeerAddr => '127.0.0.1',
-		PeerPort => '9000',
+	$master = IO::Socket::SSL->new(
+		PeerAddr => $self->{'master_addr'},
+		PeerPort => $self->{'master_port'},
 		Proto    => 'tcp',
 		SSL_use_cert => 1,
 
-		SSL_key_file => "../certs/".$self->{'name'}."-key.pem",
-		SSL_cert_file => "../certs/".$self->{'name'}."-cert.pem",
-		SSL_ca_file => '../certs/master-cert.pem',
+		SSL_key_file => $self->{'ssl_key'},
+		SSL_cert_file => $self->{'ssl_cert'},
+
+		SSL_ca_file => $self->{'ca_file'},
 
 		SSL_verify_mode => 0x01);
 	if (!$master) {
@@ -367,6 +378,39 @@ sub _addfh {
 # Metody publiczne
 ################################################################################
 
+
+#
+# Wczytanie konfiguracji z pliku
+#
+sub readConfig {
+	my ($self, $file) = @_;
+	return "No config file given." unless $file;
+
+	my $config = do $file;
+
+	return "Couldn't parse config file ($!, $@)."
+		unless defined $config;
+
+	my @config_params = qw {
+		name
+		master_addr
+		master_port
+		listen_addr
+		listen_port
+		ca_file
+		ssl_key
+		ssl_cert
+	};
+
+	foreach (@config_params) {
+		$self->{$_} = $config->{$_}
+			if defined $config->{$_};
+	}
+
+	return 0;
+}
+
+
 #
 # U¿ywane tylko do testów RPC
 #
@@ -400,14 +444,8 @@ sub getSensors() {
 	return @names;
 }
 
-
 sub info {
 	$logger->debug("Jestem wezel ${\($_[0]->{name})}\n");
-}
-
-
-sub DESTROY {
-#	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
 }
 
 sub kill {
@@ -417,6 +455,13 @@ sub kill {
 	};
 	alarm 1;
 	return 0;
+}
+
+#
+# Destruktor
+#
+sub DESTROY {
+#	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
 }
 
 
@@ -543,17 +588,14 @@ sub delFilter {
 
 sub getFilters {
 	my ($self) = @_;
-	
 	return @{$self->{'pcap_filters'}};
 }
 
 sub getFilter {
 	my ($self, $number) = @_;
-	
+	return @{$self->{'pcap_filters'}} unless defined $number;
 	return $self->{'pcap_filters'}[$number];
 }
-
-
 
 sub disablePcap {
 	my ($self) = @_;
@@ -649,9 +691,14 @@ sub run {
 	my $self = shift;
 	$logger->info("Starting node " . $self->{'name'});
 
+
 	# XXX
 	# Brak mozliwosc polaczenia nie powinien tu chyba blokowac pracy wezla
 	if ($self->{'mode'} eq 'sensor') {
+		$SIG{INT} = sub {
+			$logger->info("Caught SIGINT, dying.");
+			exit(0);
+		};
 		while (!($self->_connect_to_master())) {
 			my $delay = $self->{'reconnect'};
 			$logger->info("Retrying in $delay seconds");

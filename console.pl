@@ -20,9 +20,9 @@ my $master = IO::Socket::SSL->new( PeerAddr => $ARGV[0],
 	Proto    => 'tcp',
 	SSL_use_cert => 1,
 
-	SSL_key_file => '../certs/admin-key.enc',
-	SSL_cert_file => '../certs/admin-cert.pem',
-	SSL_ca_file => '../certs/master-cert.pem',
+	SSL_key_file => 'certs/admin-key.enc',
+	SSL_cert_file => 'certs/admin-cert.pem',
+	SSL_ca_file => 'certs/master-cert.pem',
 
 	SSL_verify_mode => 0x01);
 
