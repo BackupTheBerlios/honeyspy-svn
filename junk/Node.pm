@@ -63,8 +63,8 @@ sub new {
 		'pcap_filters' => [],
 		'compiled_filter' => undef,
 
-		# przypisane przez honeypota ip aliasy
-		'ip_aliases' = {},
+		# przypisane przez honeypota ip aliasy (ip -> interfejs)
+		'ip_aliases' => {},
 
 		# spoofowane adresy mac
 		'spoofed_mac' => {},
@@ -199,29 +199,41 @@ sub kill {
 #
 sub addIPAlias {
 	my ($self, $ip) = @_;
+	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
 
-	my $ifname = 'honey' . scalar $#{$self->{'ip_aliases'}};
-	$self->{'ip_aliases'}
+	my $ifname = 'honey:' . scalar keys %{$self->{'ip_aliases'}};
+	$self->{'ip_aliases'}{$ip} = $ifname;
 
-	system ("ifconfig honey:$n $ip") >> 8 == 0
-		or return "Couldn't assign $ip to honey:$n";
+	system ("ifconfig $ifname $ip") >> 8 == 0
+		or return "Couldn't assign $ip to $ifname";
+
+	return 0;
 }
 
 sub delIPAlias {
 	my ($self, $ip) = @_;
+	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
 
-	my $ifname = '';
-	foreach (qx/ifconfig -a/) {
-		last if $ifname && /inet addr:\s*($ip)\s/;
-		undef $ifname;
-		next unless /^(honey:\d+)/;
-		$ifname = $1;
+	if (!exists $self->{'ip_aliases'}{$ip}) {
+		my $msg = "$ip was not assigned by honeypot";
+		$logger->warn($msg);
+		return $msg;
 	}
 
+	my $ifname = $self->{'ip_aliases'}{$ip};
 	$logger->info("Removing interface $ifname");
 
 	system("ifconfig $ifname down") >> 8 == 0
 		or return "Couldn't disable $ifname interface";
+
+	return 0;
+}
+
+sub getIPAlias {
+	my ($self, $ip) = @_;
+
+	return %{$self->{'ip_aliases'}} unless defined $ip;
+	return $self->{'ip_aliases'}{$ip};
 }
 
 
@@ -299,10 +311,10 @@ sub _updateArpTables {
 		next unless $mac =~ /([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/;
 
 		system("arptables -t mangle -A OUTPUT --h-length 6 -o honey "
-		. "-s $ip -j mangle --mangle-mac-s $mac")
+		. "-s $ip -j mangle --mangle-mac-s $mac") >> 8 == 0
 			or return "Couldn't set arptables rule ($ip -> $mac)";
 
-		system("ebtables -t nat -A PREROUTING -d $mac -j redirect")
+		system("ebtables -t nat -A PREROUTING -d $mac -j redirect") >> 8 == 0
 			or return "Couldn't set ebtables rule (to redirect $mac)";
 
 		$n++;
@@ -334,6 +346,7 @@ sub replaceFilters {
 sub delFilter {
 	my ($self, $number) = @_;
 
+	return 0;
 }
 
 sub getFilters {
@@ -394,6 +407,15 @@ sub _setupPcap {
 	$logger->debug("pcap datalink: " . Net::Pcap::datalink($self->{'pcap'}));
 
 	$self->_compileFilter();
+}
+
+sub disablePcap {
+	my ($self) = @_;
+	return unless $self->{'pcap'};
+
+	my $fd = Net::Pcap::fileno($self->{'pcap'});
+	$self->{'r_set'}->remove($fd);
+	delete $self->{'r_handlers'}{$fd};
 }
 
 sub enablePcap {

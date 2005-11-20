@@ -50,6 +50,7 @@ my $s = new Sensor({
 print $prompt;
 while (defined($_ = $term->readline($prompt))) {
 	$term->addhistory($_) if /\S/;
+	next unless ($_);
 	my ($cmd, $args, @args) = ($_);
 	if (/^(.*?)\s(.*)/) {
 		($cmd, @args) = ($1, split(/\s*,\s*/, $2));
