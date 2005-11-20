@@ -59,9 +59,6 @@ while (defined($_ = $term->readline($prompt))) {
 	$s->sendToPeer($cmd, 1, @args);
 	my @res = $s->recvFromPeer();
 
-#	Sensor::sendToPeer($master, $cmd, 1, @args);
-#	my @res = Sensor::recvFromPeer($master);
-
 	print $prompt;
 }
 

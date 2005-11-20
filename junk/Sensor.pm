@@ -87,11 +87,11 @@ sub write {
 		if ($self->read) {
 			my $res = $self->recvFromPeer();
 			$logger->info("Sensor replied: $res");
-			$self->{'master'}->removefh($sock, 'w');
+			$self->{'master'}->_removefh($sock, 'w');
 		}
 	};
 
-	$self->{'master'}->removefh($self->{'socket'}, 'w');
+	$self->{'master'}->_removefh($self->{'socket'}, 'w');
 #	$self->{'master'}->remove_sensor($self);
 }
 
@@ -132,7 +132,7 @@ sub sendToPeer {
 	my ($self) = shift;
 	my $sock = $self->{'socket'};
 
-	return Node::sendToPeer($sock, @_);
+	return Node::sendDataToSocket($sock, @_);
 
 #	print $sock pack('N', length($serialized));
 #	print $sock $serialized;

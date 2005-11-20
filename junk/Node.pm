@@ -23,22 +23,23 @@ our @ISA = qw(Exporter);
 
 my $logger = get_logger();
 
-our $CORRECT_CERT;
-*CORRECT_CERT =
-	\"/C=PL/O=HoneySpy network/OU=Master Server/CN=Master";
+use constant CORRECT_CERT =>
+	"/C=PL/O=HoneySpy network/OU=Master Server/CN=Master";
 
 
 #
-# Wezel powinien miec atrybuty
-# 	nazwa
-# 	tryb [master lub sensor]
-# 	deskryptor gniazda
-# 	lista umiejetnosci
-# 	lista interfejsow
-# 	lista portow
-# 	lista uchwytów plików: gotowych do odczytu, zapisu, wyj±tku
+# sendDataToSocket - Metoda statyczna, wysy³a dane na $sock
 #
+sub sendDataToSocket {
+	my ($sock, $serialized) = (shift, freeze [@_]);
+	print $sock pack('N', length($serialized));
+	print $sock $serialized;
+}
 
+
+#
+# Konstruktor
+#
 sub new {
 	$logger->debug("konstruktor Node\n");
 
@@ -66,7 +67,7 @@ sub new {
 		# przypisane przez honeypota ip aliasy (ip -> interfejs)
 		'ip_aliases' => {},
 
-		# spoofowane adresy mac
+		# spoofowane adresy mac (ip -> mac)
 		'spoofed_mac' => {},
 
 		# Handlery dla zdarzen na uchwytach plikow
@@ -87,12 +88,17 @@ sub new {
 	bless $self, $class;
 
 	$self->_checkAbilities();
+	$self->_initIPAliases();
 
 	$self->_setupPcap() if ($self->{'abilities'}{'pcap'});
 
 	return $self;
 }
 
+
+################################################################################
+# Metody prywatne
+################################################################################
 
 #
 # XXX Do polepszenia (jest wstepna prosta wersja)
@@ -136,153 +142,20 @@ sub _checkAbilities {
 	$logger->debug("My abilities are: @abilities");
 }
 
-
-sub getAbilities {
-	my ($self) = @_;
-
-	return %{$self->{'abilities'}};
-}
-
-
-#
-# XXX
-# Akcesory i modifykatory powinny byæ robione automatycznie
-# [automatyczna modifikacja wpisów w przestrzeni nazw modu³u]
-#
-sub getName() {
-	my ($self) = @_;
-	return $self->{'name'};
-}
-
-
-#
-# Pobranie listy sensorów podleg³ych temu wêz³owi
-# (czyli ³±cznie z nim samym)
-#
-sub getSensors() {
-	my ($self) = @_;
-	my @names = $self->{'name'};
-	my %sensors = ();
-
-	foreach (keys %{$self->{'sensors'}}) {
-		if (! exists($sensors{$self->{'sensors'}{$_}})) {
-			push @names, $self->{'sensors'}{$_}{'name'};
-			$sensors{$self->{'sensors'}{$_}} = 1;
-		}
-	}
-
-	return @names;
-}
-
-
-sub info {
-	$logger->debug("Jestem wezel ${\($_[0]->{name})}\n");
-}
-
-
-sub DESTROY {
-#	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
-}
-
-sub kill {
-	$logger->info('Node is going down in a moment');
-	$SIG{'ALRM'} = sub {
-		exit 0;
-	};
-	alarm 1;
-	return 0;
-}
-
-
-#
-# Dodawanie/usuwanie aliasów IP
-#
-sub addIPAlias {
-	my ($self, $ip) = @_;
-	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
-
-	my $ifname = 'honey:' . scalar keys %{$self->{'ip_aliases'}};
-	$self->{'ip_aliases'}{$ip} = $ifname;
-
-	system ("ifconfig $ifname $ip") >> 8 == 0
-		or return "Couldn't assign $ip to $ifname";
-
-	return 0;
-}
-
-sub delIPAlias {
-	my ($self, $ip) = @_;
-	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
-
-	if (!exists $self->{'ip_aliases'}{$ip}) {
-		my $msg = "$ip was not assigned by honeypot";
-		$logger->warn($msg);
-		return $msg;
-	}
-
-	my $ifname = $self->{'ip_aliases'}{$ip};
-	$logger->info("Removing interface $ifname");
-
-	system("ifconfig $ifname down") >> 8 == 0
-		or return "Couldn't disable $ifname interface";
-
-	return 0;
-}
-
-sub getIPAlias {
-	my ($self, $ip) = @_;
-
-	return %{$self->{'ip_aliases'}} unless defined $ip;
-	return $self->{'ip_aliases'}{$ip};
-}
-
-
-#
-# Zmiana charakterystyki stosu TCP/IP
-#
-sub setFingerprint {
-	my ($self, $addr, $os) = @_;
-	$logger->info("Setting $os fingerprint on $addr");
-}
-
-sub delFingerprint {
-	my ($self, $addr) = @_;
-	$logger->info("Disabling fingerprint mangling on $addr");
-}
-
-
-#
-# Falszowanie adresow MAC
-#
-sub setMAC {
-	my ($self, $addr, $mac) = @_;
-	$logger->info("Setting $mac address on $addr");
-
-	$self->{'spoofed_mac'}{$addr} = $mac;
-	$self->_updateArpTables();
-}
-
-sub delMAC {
-	my ($self, $addr) = @_;
-	$logger->info("Disabling MAC mangling on $addr");
-
-	delete $self->{'spoofed_mac'}{$addr};
-	return $self->_updateArpTables();
-}
-
-sub getMAC {
-	my ($self, $ip) = @_;
-
-	return $self->{'spoofed_mac'}{$ip} if defined $ip;
-	return %{$self->{'spoofed_mac'}};
-}
-
-# usuwa wszystkie odwzorowania adres -> mac
-sub cleanMAC {
+sub _initIPAliases {
 	my ($self) = @_;
 	
-	$self->{'spoofed_mac'} = {};
-	return $self->_updateArpTables();
+	my $ifname;
+	foreach (qx/ifconfig -a/) {
+		if (/^(honey:\d+)/) {
+			$ifname = $1;
+		}
+		elsif ($ifname && /inet addr:(\S+)\s/) {
+			print "$1 -> $ifname\n";
+			$self->{'ip_aliases'}{$1} = $ifname;
+			undef $ifname;
+		}
+	}
 }
 
 sub _updateArpTables {
@@ -290,19 +163,6 @@ sub _updateArpTables {
 
 	system('ebtables -t nat -F PREROUTING ; arptables -t mangle -F OUTPUT') >> 8 == 0
 		or return "Couldn't clean ebtables and arptables rules";
-
-#
-# XXX to powinno byc w metodach dodajacej/usuwajacej aliasy ip
-#
-#	my (@aliases) = ();
-#	foreach (qx/ifconfig -a/) {
-#		next unless /^(honey:\d+)/;
-#		push @aliases, $1;
-#	}
-#	foreach (@aliases) {
-#		system("ifconfig $_ down") >> 8 == 0
-#			or return "Couldn't disable $_ interface";
-#	}
 
 	my $n = 0;
 	while ((my ($ip, $mac) = each(%{$self->{'spoofed_mac'}}))) {
@@ -321,44 +181,6 @@ sub _updateArpTables {
 	}
 
 	return 0;
-}
-
-
-
-#
-# Nasluchiwanie ruchu sieciowego (PCAP)
-#
-sub addFilter {
-	my ($self, $new_filter) = @_;
-	$logger->debug("Adding filter: $new_filter");
-
-	push @{$self->{'pcap_filters'}}, $new_filter;
-	$self->_compileFilter();
-}
-
-sub replaceFilters {
-	my ($self, $new_filter) = @_;
-	
-	$self->{'pcap_filters'} = [$new_filter];
-	$self->_compileFilter();
-}
-
-sub delFilter {
-	my ($self, $number) = @_;
-
-	return 0;
-}
-
-sub getFilters {
-	my ($self) = @_;
-	
-	return @{$self->{'pcap_filters'}};
-}
-
-sub getFilter {
-	my ($self, $number) = @_;
-	
-	return $self->{'pcap_filters'}[$number];
 }
 
 sub _compileFilter {
@@ -409,36 +231,6 @@ sub _setupPcap {
 	$self->_compileFilter();
 }
 
-sub disablePcap {
-	my ($self) = @_;
-	return unless $self->{'pcap'};
-
-	my $fd = Net::Pcap::fileno($self->{'pcap'});
-	$self->{'r_set'}->remove($fd);
-	delete $self->{'r_handlers'}{$fd};
-}
-
-sub enablePcap {
-	my ($self) = @_;
-
-	if (!$self->{'pcap'}) {
-		my $err = "Pcap not supported";
-		$logger->error($err);
-		return $err;
-	}
-	
-	
-	my $fd = Net::Pcap::fileno($self->{'pcap'});
-	$self->{'r_set'}->add($fd);
-	$self->{'r_handlers'}{$fd} = sub {
-		$logger->debug("Got packet");
-		Net::Pcap::loop($self->{'pcap'}, 1, \&_pcapPacket, 'aaa');
-	};
-
-	return 0;
-}
-
-
 sub _pcapPacket {
 	my ($user_data, $hdr, $pkt) = @_;
 
@@ -462,70 +254,40 @@ sub _pcapPacket {
 	$logger->info($msg);
 }
 
+sub _callFunction {
+	my ($self, $function, $arrayctx, @args) = @_;
+	my @result;
 
-
-#
-# Przypisanie us³ugi na danym porcie
-#
-sub addService {
-	my ($self, $addr, $proto, $port, $script, @args) = @_;
-	$logger->info("Adding service on $addr:$port ($proto)");
-
-	my $socket = new IO::Socket::INET(
-		LocalAddr => $addr,
-		LocalPort => $port,
-		Proto => $proto,
-		Listen => 5,
-		Reuse => 1
-	);
-	if (!$socket) {
-		my $msg = "Couldn't open socket: $!";
-		$logger->error($msg);
-		return $msg;
-	}
-
-	$self->addfh($socket, 'r');
-	$self->{'r_handlers'}{$socket} = sub {
-		my $client = $socket->accept();
-		if (! $client) {
-			$logger->error("Couldn't accept connection ($!)");
-			return 1;
+	eval {
+		no strict 'refs';
+		unshift(@args, $self);
+		if ($arrayctx) {
+			@result = @{[&{*{$function}}(@args)]};
 		}
-		$logger->debug("Connection to service $script from " . $client->peerhost);
-		$SIG{'CHLD'} = 'IGNORE';
-		my $pid = fork();
-		if (! $pid) {
-			setsid();
-			open(STDIN, "<&=".fileno($client));
-			open(STDOUT, ">&=".fileno($client));
-#			open(STDERR, ">&=".fileno($client));
-			{ exec($script, @args); }
-			$logger->error("Couldn't run script ($!)");
-			return 1;
+		else {
+			@result = (scalar &{*{$function}}(@args));
 		}
 	};
+	for ($@) {
+		last unless ($@);
 
-	return 0;
+		if (/Undefined subroutine/) {
+			$result[0] = "No such function ($function) on remote side";
+			last;
+		}
+		else {
+			$result[0] = "Error $_ during excecution of remote called function";
+		}
+
+		$logger->error($result[0]);
+	}
+	return @result;
 }
-
-sub delService {
-	my ($self, $addr, $proto, $port) = @_;
-	$logger->info("Removing service from $addr:$port ($proto)");
-}
-
-
-# XXX
-sub sendToPeer {
-	my ($sock, $serialized) = (shift, freeze [@_]);
-	print $sock pack('N', length($serialized));
-	print $sock $serialized;
-}
-
 
 sub _configure_master {
    my ($self, $master) = @_;
 	
-	$self->addfh($master, 're');
+	$self->_addfh($master, 're');
 	$self->{'r_handlers'}{$master} = sub {
 		$self->process_command($master);
 	};
@@ -564,8 +326,8 @@ sub _connect_to_master {
 		$logger->debug("Certificate's subject: $subject_name");
 		$logger->debug("Certificate's issuer: $issuer_name");
 
-		if ($subject_name eq $CORRECT_CERT
-			&& $issuer_name eq $CORRECT_CERT) {
+		if ($subject_name eq CORRECT_CERT
+			&& $issuer_name eq CORRECT_CERT) {
 				$trusted_master = 1;
 		}
 	}
@@ -579,8 +341,7 @@ sub _connect_to_master {
 	$self->_configure_master($master);
 }
 
-
-sub removefh {
+sub _removefh {
 	my ($self, $fh, $setname) = @_;
 	$setname = 'rwe' unless defined $setname;
 
@@ -591,8 +352,7 @@ sub removefh {
 	}
 }
 
-
-sub addfh {
+sub _addfh {
 	my ($self, $fh, $setname) = @_;
 	$setname = 'rwe' unless defined $setname;
 
@@ -603,11 +363,294 @@ sub addfh {
 }
 
 
+################################################################################
+# Metody publiczne
+################################################################################
+
+#
+# U¿ywane tylko do testów RPC
+#
+sub getAbilities {
+	my ($self) = @_;
+	return %{$self->{'abilities'}};
+}
+
+sub getName() {
+	my ($self) = @_;
+	return $self->{'name'};
+}
+
+
+#
+# Pobranie listy sensorów podleg³ych temu wêz³owi
+# (czyli ³±cznie z nim samym)
+#
+sub getSensors() {
+	my ($self) = @_;
+	my @names = $self->{'name'};
+	my %sensors = ();
+
+	foreach (keys %{$self->{'sensors'}}) {
+		if (! exists($sensors{$self->{'sensors'}{$_}})) {
+			push @names, $self->{'sensors'}{$_}{'name'};
+			$sensors{$self->{'sensors'}{$_}} = 1;
+		}
+	}
+
+	return @names;
+}
+
+
+sub info {
+	$logger->debug("Jestem wezel ${\($_[0]->{name})}\n");
+}
+
+
+sub DESTROY {
+#	$logger->debug("Node ${\($_[0]->{'name'})} destructor\n");
+}
+
+sub kill {
+	$logger->info('Node is going down in a moment');
+	$SIG{'ALRM'} = sub {
+		exit 0;
+	};
+	alarm 1;
+	return 0;
+}
+
+
+#################################
+# Dodawanie/usuwanie aliasów IP
+#
+sub addIPAlias {
+	my ($self, $ip) = @_;
+	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
+
+	my $ifname = 'honey:' . scalar keys %{$self->{'ip_aliases'}};
+	$self->{'ip_aliases'}{$ip} = $ifname;
+
+	system ("ifconfig $ifname $ip") >> 8 == 0
+		or return "Couldn't assign $ip to $ifname";
+
+	return 0;
+}
+
+sub delIPAlias {
+	my ($self, $ip) = @_;
+	return unless $ip =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/;
+
+	if (!exists $self->{'ip_aliases'}{$ip}) {
+		my $msg = "$ip was not assigned by honeypot";
+		$logger->warn($msg);
+		return $msg;
+	}
+
+	my $ifname = $self->{'ip_aliases'}{$ip};
+	$logger->info("Removing interface $ifname");
+
+	system("ifconfig $ifname down") >> 8 == 0
+		or return "Couldn't disable $ifname interface";
+
+	delete $self->{'ip_aliases'}{$ip};
+
+	return 0;
+}
+
+sub getIPAlias {
+	my ($self, $ip) = @_;
+
+	return %{$self->{'ip_aliases'}} unless defined $ip;
+	return $self->{'ip_aliases'}{$ip};
+}
+
+
+
+######################################
+# Zmiana charakterystyki stosu TCP/IP
+#
+sub setFingerprint {
+	my ($self, $addr, $os) = @_;
+	$logger->info("Setting $os fingerprint on $addr");
+}
+
+sub delFingerprint {
+	my ($self, $addr) = @_;
+	$logger->info("Disabling fingerprint mangling on $addr");
+}
+
+
+##########################
+# Falszowanie adresow MAC
+#
+sub setMAC {
+	my ($self, $addr, $mac) = @_;
+	$logger->info("Setting $mac address on $addr");
+
+	$self->{'spoofed_mac'}{$addr} = $mac;
+	$self->_updateArpTables();
+}
+
+sub delMAC {
+	my ($self, $addr) = @_;
+	$logger->info("Disabling MAC mangling on $addr");
+
+	delete $self->{'spoofed_mac'}{$addr};
+	return $self->_updateArpTables();
+}
+
+sub getMAC {
+	my ($self, $ip) = @_;
+
+	return $self->{'spoofed_mac'}{$ip} if defined $ip;
+	return %{$self->{'spoofed_mac'}};
+}
+
+# usuwa wszystkie odwzorowania adres -> mac
+sub cleanMAC {
+	my ($self) = @_;
+	
+	$self->{'spoofed_mac'} = {};
+	return $self->_updateArpTables();
+}
+
+
+
+
+########################################
+# Nasluchiwanie ruchu sieciowego (PCAP)
+#
+sub addFilter {
+	my ($self, $new_filter) = @_;
+	$logger->debug("Adding filter: $new_filter");
+
+	push @{$self->{'pcap_filters'}}, $new_filter;
+	$self->_compileFilter();
+}
+
+sub replaceFilters {
+	my ($self, $new_filter) = @_;
+	
+	$self->{'pcap_filters'} = [$new_filter];
+	$self->_compileFilter();
+}
+
+sub delFilter {
+	my ($self, $number) = @_;
+
+	return 0;
+}
+
+sub getFilters {
+	my ($self) = @_;
+	
+	return @{$self->{'pcap_filters'}};
+}
+
+sub getFilter {
+	my ($self, $number) = @_;
+	
+	return $self->{'pcap_filters'}[$number];
+}
+
+
+
+sub disablePcap {
+	my ($self) = @_;
+	return unless $self->{'pcap'};
+
+	my $fd = Net::Pcap::fileno($self->{'pcap'});
+	$self->{'r_set'}->remove($fd);
+	delete $self->{'r_handlers'}{$fd};
+}
+
+sub enablePcap {
+	my ($self) = @_;
+
+	if (!$self->{'pcap'}) {
+		my $err = "Pcap not supported";
+		$logger->error($err);
+		return $err;
+	}
+	
+	
+	my $fd = Net::Pcap::fileno($self->{'pcap'});
+	$self->{'r_set'}->add($fd);
+	$self->{'r_handlers'}{$fd} = sub {
+		$logger->debug("Got packet");
+		Net::Pcap::loop($self->{'pcap'}, 1, \&_pcapPacket, 'aaa');
+	};
+
+	return 0;
+}
+
+
+
+
+
+#####################################
+# Przypisanie us³ugi na danym porcie
+#
+sub addService {
+	my ($self, $addr, $proto, $port, $script, @args) = @_;
+	$logger->info("Adding service on $addr:$port ($proto)");
+
+	my $socket = new IO::Socket::INET(
+		LocalAddr => $addr,
+		LocalPort => $port,
+		Proto => $proto,
+		Listen => 5,
+		Reuse => 1
+	);
+	if (!$socket) {
+		my $msg = "Couldn't open socket: $!";
+		$logger->error($msg);
+		return $msg;
+	}
+
+	$self->_addfh($socket, 'r');
+	$self->{'r_handlers'}{$socket} = sub {
+		my $client = $socket->accept();
+		if (! $client) {
+			$logger->error("Couldn't accept connection ($!)");
+			return 1;
+		}
+		$logger->debug("Connection to service $script from " . $client->peerhost);
+		$SIG{'CHLD'} = 'IGNORE';
+		my $pid = fork();
+		if (! $pid) {
+			setsid();
+			open(STDIN, "<&=".fileno($client));
+			open(STDOUT, ">&=".fileno($client));
+#			open(STDERR, ">&=".fileno($client));
+			{ exec($script, @args); }
+			$logger->error("Couldn't run script ($!)");
+			return 1;
+		}
+	};
+
+	return 0;
+}
+
+sub delService {
+	my ($self, $addr, $proto, $port) = @_;
+	$logger->info("Removing service from $addr:$port ($proto)");
+}
+
+
+
+
+
+######################################################
+# G³ówna pêtla serwera (obs³uga zdarzeñ na gniazdach)
+#
+
 sub run {
 	my $self = shift;
 	$logger->info("Starting node " . $self->{'name'});
 
 	# XXX
+	# Brak mozliwosc polaczenia nie powinien tu chyba blokowac pracy wezla
 	if ($self->{'mode'} eq 'sensor') {
 		while (!($self->_connect_to_master())) {
 			my $delay = $self->{'reconnect'};
@@ -658,44 +701,17 @@ sub run {
 }
 
 
-sub _callFunction {
-	my ($self, $function, $arrayctx, @args) = @_;
-	my @result;
-
-	eval {
-		no strict 'refs';
-		unshift(@args, $self);
-		if ($arrayctx) {
-			@result = @{[&{*{$function}}(@args)]};
-		}
-		else {
-			@result = (scalar &{*{$function}}(@args));
-		}
-	};
-	for ($@) {
-		last unless ($@);
-
-		if (/Undefined subroutine/) {
-			$result[0] = "No such function ($function) on remote side";
-			last;
-		}
-		else {
-			$result[0] = "Error $_ during excecution of remote called function";
-		}
-
-		$logger->error($result[0]);
-	}
-	return @result;
-}
-
-
+#
+# Wykonuje funkcjê przes³an± przez sieæ wraz z argumentami
+# i jej kontekstem wywo³ania
+#
 sub process_command {
 	my ($self, $sock) = @_;
 	$logger->debug("Processing data from server.");
 
 	if ($sock->peek(undef, 1) == 0) {
 		$logger->debug("My master closed connection.");
-		$self->removefh($sock, 're');
+		$self->_removefh($sock, 're');
 		$self->{'connected'} = 0;
 		close($sock);
 	}
@@ -722,16 +738,19 @@ sub process_command {
 		my @result = $self->_callFunction($function, $arrayctx, @args);
 		$logger->debug("Function result: @result");
 
-		$self->addfh($sock, 'w');
+		$self->_addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
-			sendToPeer($sock, @result); # XXX
-			$self->removefh($sock, 'w');
+			sendDataToSocket($sock, @result);
+			$self->_removefh($sock, 'w');
 		};
 
 	}
 }
 
 
+#
+# Wykonuje funkcjê na podanym wê¼le sieci
+#
 sub runOnNode {
 	my ($self, $name, $function, @args) = @_;
 	my @result;

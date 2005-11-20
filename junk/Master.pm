@@ -39,14 +39,7 @@ sub new($) {
 	return $self;
 }
 
-#
-# XXX
-# Akcesory i modifykatory powinny byæ robione automatycznie
-# [automatyczna modifikacja wpisów w przestrzeni nazw modu³u]
-#
-sub getName() {
-	return shift->{'name'};
-}
+
 
 sub DESTROY {
 #	$logger->debug("Destruktor Mastera\n");
@@ -76,7 +69,7 @@ sub run {
 		exit(1);
 	}
 	$self->{'listen_sock'} = $listen_sock;
-	$self->addfh($listen_sock, 'r');
+	$self->_addfh($listen_sock, 'r');
 
 	$SIG{INT} = sub {
 		$logger->info("Caught SIGINT.");
@@ -101,7 +94,7 @@ sub remove_sensor {
 
 	delete $self->{'sensors'}{$sensor->{'socket'}};
 	delete $self->{'sensors'}{$sensor->{'name'}};
-	$self->removefh($sensor->{'socket'});
+	$self->_removefh($sensor->{'socket'});
 	close $sensor->{'socket'};
 }
 
@@ -164,7 +157,7 @@ sub accept_client {
 		$sensor->read();
 	};
 	$logger->debug("Added $socket to select sets");
-	$self->addfh($socket, 'rw');
+	$self->_addfh($socket, 'rw');
 }
 
 
