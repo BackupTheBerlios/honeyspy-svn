@@ -130,7 +130,7 @@ sub accept_client {
 
 	if ($client_name eq 'admin') {
 		$logger->info("Administrator connected from " . $socket->peerhost);
-		$self->_configure_master($socket);
+		$self->_configure_master_connection($socket);
 		return;
 	}
 

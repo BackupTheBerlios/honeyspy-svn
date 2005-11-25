@@ -146,7 +146,16 @@ sub recvFromPeer {
 	sysread($sock, $buf, 4);
 	my $len = unpack('N', $buf);
 	sysread($sock, $buf, $len);
-	my @resp = @{thaw($buf)};
+	my @resp;
+	eval {
+		@resp = @{thaw($buf)};
+	};
+	for ($@) {
+		if (/Magic number checking on storable string failed/) {
+			$logger->error("Wrong data received from sensor.");
+			return;
+		}
+	}
 	$logger->debug("Odpowiedz sensora:\n");
 	local $" = "\n->";
 	$logger->debug("@resp\n");

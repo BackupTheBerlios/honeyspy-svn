@@ -8,14 +8,16 @@ use Log::Log4perl (':easy');
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
 use IO::Socket::INET;
-use NetPacket::IP;
 use NetPacket::Ethernet qw(:strip);
 use NetPacket::Ethernet;
+use NetPacket::IP;
+use NetPacket::TCP;
 use Net::Pcap;
 use Storable ('thaw');
 use POSIX qw(setsid);
 use Carp;
 use Master;
+use Socket;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -95,8 +97,6 @@ sub new {
 
 	$self->_initIPAliases()
 		if $self->{'abilities'}{'ipaliases'};
-	$self->_setupPcap()
-		if $self->{'abilities'}{'pcap'};
 
 	return $self;
 }
@@ -196,7 +196,7 @@ sub _compileFilter {
 	my ($self) = @_;
 	my $compiled;
 
-	return unless @{$self->{'pcap_filters'}};
+	return unless @{$self->{'pcap_filters'}} && $self->{'pcap'};
 
 	# sprawdzic kazda regule po kolei
 	foreach (@{$self->{'pcap_filters'}}) {
@@ -260,6 +260,14 @@ sub _pcapPacket {
 	$msg .= ' id:' . $ip_obj->{'id'};
 	$msg .= ' proto:' . $ip_obj->{'proto'};
 	$msg .= ' flags:' . $ip_obj->{'flags'};
+
+	if ($ip_obj->{'proto'} == getprotobyname('tcp')) {
+		my $tcp_obj = NetPacket::TCP->decode($ip_obj->{'data'});
+		$msg .= ' | tcp';
+		$msg .= ' src port: ' . $tcp_obj->{'src_port'};
+		$msg .= ' dst port: ' . $tcp_obj->{'dest_port'};
+	}
+
 	$logger->info($msg);
 }
 
@@ -293,7 +301,7 @@ sub _callFunction {
 	return @result;
 }
 
-sub _configure_master {
+sub _configure_master_connection {
    my ($self, $master) = @_;
 	
 	$self->_addfh($master, 're');
@@ -349,7 +357,7 @@ sub _connect_to_master {
 	$logger->info("Certificate recognized.");
 	$logger->debug("Using cipher: $cipher");
 
-	$self->_configure_master($master);
+	$self->_configure_master_connection($master);
 }
 
 sub _removefh {
@@ -583,6 +591,15 @@ sub replaceFilters {
 sub delFilter {
 	my ($self, $number) = @_;
 
+	if ($number) {
+		my @filters = @{$self->{'pcap_filters'}};
+		@filters = @filters[0..$number-1, $number+1..$#filters];
+		$self->{'pcap_filters'} = \@filters;
+	}
+	else {
+		$self->{'pcap_filters'} = [];
+	}
+
 	return 0;
 }
 
@@ -604,18 +621,30 @@ sub disablePcap {
 	my $fd = Net::Pcap::fileno($self->{'pcap'});
 	$self->{'r_set'}->remove($fd);
 	delete $self->{'r_handlers'}{$fd};
+
+	Net::Pcap::close($self->{'pcap'});
+	$self->{'pcap'} = undef;
+
+	return 0;
 }
 
 sub enablePcap {
 	my ($self) = @_;
 
-	if (!$self->{'pcap'}) {
+	if (!$self->{'abilities'}{'pcap'}) {
 		my $err = "Pcap not supported";
 		$logger->error($err);
 		return $err;
 	}
-	
-	
+
+	if ($self->{'pcap'}) {
+		my $err = "Pcap already enabled";
+		$logger->info($err);
+		return $err;
+	}
+
+	$self->_setupPcap();
+
 	my $fd = Net::Pcap::fileno($self->{'pcap'});
 	$self->{'r_set'}->add($fd);
 	$self->{'r_handlers'}{$fd} = sub {
