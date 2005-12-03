@@ -5,6 +5,8 @@ use Switch;
 my $komeda;
 my $user=0;
 
+$| = 1;
+
 print "+OK POP3 Ready poczta.o2.pl\n";
 
 while(1)

@@ -4,6 +4,8 @@ use strict;
 use POSIX qw(strftime locale_h);
 use Switch;
 
+$| = 1;
+
 my $line = <STDIN>;
 chomp $line;
 

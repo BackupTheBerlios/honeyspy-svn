@@ -2,6 +2,8 @@
 use strict;
 use Switch;
 
+$| = 1;
+
 my $komeda;
 my $user="@";
 my $nazwa_serwera="server.pl";

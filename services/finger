@@ -2,6 +2,8 @@
 
 use strict;
 
+$| = 1;
+
 my $username = <STDIN>;
 chomp $username;
 
