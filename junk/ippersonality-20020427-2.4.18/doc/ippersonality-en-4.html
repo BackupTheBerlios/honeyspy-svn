@@ -1,0 +1,741 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Configuration</TITLE>
+ <LINK HREF="ippersonality-en-5.html" REL=next>
+ <LINK HREF="ippersonality-en-3.html" REL=previous>
+ <LINK HREF="ippersonality-en.html#toc4" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-en-5.html">Next</A>
+<A HREF="ippersonality-en-3.html">Previous</A>
+<A HREF="ippersonality-en.html#toc4">Contents</A>
+<HR>
+<H2><A NAME="s4">4. Configuration</A></H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The configuration of the PERS target is done in userspace with the
+<EM>iptables</EM> command and an associated dynamic library for
+specific parameters. This library adds new options for setting up the
+PERS target; one of the options allows the user to specify a
+configuration file containing all the parameters needed to emulate a
+particular operating system. Hence by using different
+configuration files for each different netfilter rule, one can easily
+choose to look like a particular OS for some sources or destination
+addresses, for a specific interface, and/or for other matching criterias.
+<P>
+<P>
+<H2><A NAME="ss4.1">4.1 Command line options</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>Command line options are passed to the target when adding a rule
+using it, for instance with a syntax like the following one:
+<P>
+<P><CODE>iptables -A &lt;chain&gt; -s &lt;source&gt; -d &lt;destination&gt; -j PERS &lt;options&gt;</CODE>
+<P>
+<P>
+<P>[Refer to <EM>iptables</EM> documentation for more information on
+the global syntax]
+<P>
+<P>The following options are recognized by the library:
+<P>
+<UL>
+<LI><EM>-tweak {src|dst}</EM>
+
+
+
+
+
+
+
+: This option sets the way packets should be rewritten for the
+corresponding rule. If its value is "src", then it means one wishes to
+protect the source of the matching packets (for instance, rewriting
+ISNs). If it is set do "dst", then the destination is protected (in
+that case acks would be rewritten).</LI>
+<LI><EM>-local</EM>
+
+
+
+
+
+: This option specifies that either the source or the destination
+(depending on the value of tweak) is local, and that the "decoy" and
+"udp" modules should be enabled for it (if available in the configuration
+used) in order to completely fool tools suchs as nmap.</LI>
+<LI><EM>-conf</EM> 
+
+
+
+<EM>&lt;file&gt;</EM>: This option sets the configuration file to
+use for the emulated system in this rule (see below).</LI>
+</UL>
+<P>
+<H2><A NAME="ss4.2">4.2 Configuration file</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The parameters for emulation of a particular operating system are
+specified in the configuration file. This file has a syntax similar
+to named.conf, inspired from C. Options are grouped together in logical
+blocks (delimited with { and }), each block corresponding to a different
+kind of packet rewriting operation. Each option is composed of an identifier
+followed by one or more arguments, and ended by a ;.
+Options and blocks can be specified in any order.
+<P>
+<P>
+<H3>Identification </H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The first item of the configuration file is an identification for the
+system being described. It is a string at most 20 characters long. Syntax is as
+follows:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+ id "FakeOS";
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H3>Generic TCP parameters</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named <EM>tcp</EM>.
+Example:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp {
+    incoming yes;
+    outgoing no;
+    max-window 65536;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>incoming</EM> parameter sets whether you wish to enable
+TCP connections modifications (ISN, window size, options) for
+incoming connections to the protected zone. It can either be set to
+<EM>yes</EM> or <EM>no</EM>.
+<P>
+<P>
+<P>The <EM>outgoing</EM> parameter has the same meaning but for
+outgoing connections
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>max-window</EM> parameter controls window size rewriting
+for TCP packets from connections matching the previous options. If it
+is set to a non-null value, then for every new connection with a
+window size greater than the given value, an offset is computed and
+applied to every packet to set the window size below the specified
+value for the length of the connection.
+<P>
+<H3>Sequence Numbers Generator Parameters</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named
+<EM>tcp_isn</EM>.
+Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_isn {
+    type random-inc 10000;
+    initial-value 2600;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>The <EM>type</EM> parameter sets the type of generator to emulate
+and possible options for it. The following types are supported:
+<P>
+<UL>
+<LI><EM>fixed-inc &lt;number&gt;</EM>
+
+
+
+
+
+
+: That's the simplest generator. The initial sequence number
+is simply increased of a fixed value (specified as
+argument) at each new connection. Using 0 as the increment value
+allows one to emulated systems using fixed initial sequence numbers.</LI>
+<LI><EM>random-inc &lt;number&gt;</EM>
+
+
+
+
+
+
+: That's a pseudo-random generator. For each new connection, the
+initial sequence number is incremented by a random value chosen
+between 0 and the specified number. This is the kind of generator used
+on systems such as Linux, FreeBSD, ... The strength of such a
+generator is determined by its random range.</LI>
+<LI><EM>true-random</EM>
+
+
+
+
+: This is a truly random generator. For each new connection, the
+initial sequence number is randomly chosen using the kernel's
+internal entropy based random generator.</LI>
+<LI><EM>builtin</EM>
+
+
+
+: This is the host system builtin generator. Hence under linux, it
+is a random incremented generator.</LI>
+<LI><EM>time-dep &lt;number&gt;</EM>
+
+
+
+
+
+
+
+: This is a time dependant generator. The passes number specifies
+the frequency of the generator (in Hz). For instance, using 25000 for
+the value allows one to implement the generator
+recommended in RFC 793: the ISN is then incremented by 1 every 4
+micro-seconds. (however, the generator granularity depends on the host
+system ticks precision, 100 Hz by default on linux/x86)</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>initial-value</EM> sets the initial value to use for the
+emulated generator. A numeric value can be specified or
+<EM>random</EM> which will pick this number randomly when loading the
+rule. This parameter is of little importance on strong generators.
+<P>
+<P>
+<H3>IP ID Generator Parameters</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named
+<EM>ip_id</EM>.
+Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  ip_id {
+    type broken-inc 1;
+    initial-value 2600;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>type</EM> parameter sets the type of generator to emulate
+and possible options for it. The same types as for the ISN generator
+are available, with an additional one, <EM>broken-inc
+number</EM>: it is an incremented counter of the specified value, but
+the result is saved in the packet in little endian order instead of
+network order.
+<P>
+<H3>Options Reordering Parameters</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named
+<EM>tcp_options</EM>.
+Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_options {
+    keep-unknown yes;
+    keep-unused no;
+    isolated-packets yes;
+    timestamp-scale 100;
+    code {
+      &lt;code...>
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>This block defines how TCP options of a packet should be
+rewritten. The <EM>code</EM> subsection contains a simple program
+written in a langage close to C (see below), which is compiled by the
+<EM>libipt_PERS.so</EM> module. This code is passed to the
+virtual machine that fills an option buffer (part of its state) as it
+runs it. When the execution is over, the new options buffer is used to
+replace the original options buffer of the packet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>keep-unknown</EM> parameter specifies if "unknown" options
+in the original packet (hence that can't be handled in the code)
+should be added at the end of the new options buffer so they are
+kept. It can be set to either <EM>yes</EM> or <EM>no</EM>.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>keep-unused</EM> parameter specifies if options from the
+original packet that haven't been used (probed or copied) by the code
+should be added at the end of the new options buffer so they are
+kept. It can be set to either <EM>yes</EM> or <EM>no</EM>. This allows
+one to use a very simple code to reorder a few options while keeping
+the other ones functionnal.
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>isolated-packets</EM> parameter specifies if options
+reordering should be performed for packets that do not belong to any
+known connection. It can be set to either <EM>yes</EM> or
+<EM>no</EM>. (defaults to no).
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>timestamp-scale</EM> parameter specifies if the timestamp
+options of TCP packets related to the local machine should be changed
+to a new frequency. Its argument is the new frequency to use. (if it
+is null or equal to the base frequency it is ignored).
+<P>
+<H3>TCP decoying Parameters</H3>
+
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named
+<EM>tcp_decoy</EM>.
+Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_decoy {
+    code {
+      &lt;code...>
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>This block only contains a <EM>code</EM> subsection like the
+previous one, that defines tests to perform on packets in order to
+recognize pathological packets from analysis tools and decide the way
+to handle them. The language used is the same as before (see below).
+<P>
+<H3>UDP Decoying Parameters</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>These parameters are grouped together in a block named
+<EM>udp_unreach</EM>.
+Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  udp_unreach {
+    reply yes;
+    df no;
+    max-len 56;
+    tos 0;
+  
+    mangle-original {
+      ip-len 21;
+      ip-id same;
+      ip-csum zero;
+      udp-len 308;
+      udp-csum zero;
+      udp-data same;
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>reply</EM> parameter sets if you want an ICMP "port
+unreachable" message to be sent when receiving an UDP datagram for a
+port not listening. It can be set to either <EM>yes</EM> or
+<EM>no</EM>. The other parametres of this block only apply if this is enabled.
+<P>
+<P>
+<P>The <EM>df</EM> parameters specifies whether the "Don't Fragment"
+bit should be set on generated ICMP messages.
+<P>
+<P>
+<P>The <EM>max-len</EM> parameter specifies the maximum length of the
+generated ICMP messages.
+<P>
+<P>
+<P>The <EM>tos</EM> parameters specifies the value for the "Type Of
+service" field of the IP header of the generated ICMP messages.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>When sending an ICMP "port unreachable" message, part of the
+original packet is sent back along. The <EM>mangle-original</EM>
+subsection specify how this part should be handled and mangled. The
+following parameters are available:
+<P>
+<UL>
+<LI><EM>ip-len {same|&lt;number&gt;}</EM>
+
+
+
+
+: sets the changes to apply to the length field of the original
+packet IP header. It can be set to <EM>same</EM> (in that case it is
+unchanged) or to any numeric value (in that case it is replaced).</LI>
+<LI><EM>ip-id {same|mangle|zero}</EM>
+
+
+
+
+
+: sets the changes to apply to the id field of the original
+packet IP header. It can be set to <EM>same</EM>, <EM>zero</EM> (then it is
+set to zero), <EM>mangle</EM> (it is changed for a different value).
+</LI>
+<LI><EM>ip-csum {same|mangle|zero}</EM>
+
+
+
+: sets the changes to apply to the checksum of the original
+packet IP header. It can be set to <EM>same</EM>, <EM>zero</EM>, <EM>mangle</EM>.
+</LI>
+<LI><EM>udp-len {same|&lt;number&gt;}</EM>
+
+
+
+: sets the changes to apply to the length field of the original
+packet UDP header. It can be set to <EM>same</EM> or to any numeric value.
+</LI>
+<LI><EM>udp-csum {same|mangle|zero}</EM>
+
+
+
+: sets the changes to apply to the checksum of the original
+packet UDP header. It can be set to <EM>same</EM>, <EM>zero</EM>,
+<EM>mangle</EM>.
+</LI>
+<LI><EM>udp-data {same|mangle|zero}</EM>
+
+
+
+
+: sets changes to apply to the first byte of the original UDP
+datagram payload. It can be set to <EM>same</EM>, <EM>zero</EM>,
+<EM>mangle</EM>.
+</LI>
+</UL>
+<P>
+<H2><A NAME="ss4.3">4.3 Language</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>tcp_options</EM> and <EM>tcp_decoy</EM>
+blocks both have a <EM>code</EM> subsection that can contain a
+program. As seen previously, this program is compiled by the dynamic
+library extending <EM>iptables</EM> into pseudo-code that is
+interpreted in the kernel module by a simple virtual machine. It
+operates over a TCP packet and handles an internal state, composed of
+the following:
+<P>
+<UL>
+<LI>A TCP options buffer</LI>
+<LI>
+
+Several "registers": <EM>flags</EM>, <EM>mss</EM>, <EM>wscale</EM>,
+<EM>win</EM>, <EM>ack</EM> and <EM>df</EM> corresponding to the TCP
+header fields of the same name for a potential reply packet.</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>Code from the <EM>tcp_options</EM> subsection is applied to
+an incoming TCP packet, and after running the program the options
+buffer from the virtual machine state is used as the new options
+buffer for that packet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Code from the <EM>tcp_decoy</EM> section is also applied to
+an incoming TCP packet, but the packet is not modifed. Depending on
+the result of running the program a new packet can be built
+from the state of the virtual machine and sent to the source of the
+original packet. The original packet can also be dropped, or passed as
+is to the next rules.
+<P>
+<P>
+<P>
+<P>These programs are written in a language close to C. Some
+conditionnal tests can be performed on the original packets in order
+to adjust behavior depending on its contents/status
+<P>
+<P>A test looks like:
+<BLOCKQUOTE><CODE>
+<PRE>
+  if (test) {
+    &lt;action>
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+
+or
+<BLOCKQUOTE><CODE>
+<PRE>
+  if (test) {
+    &lt;action>
+  } else {
+    &lt;action>
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>A test is composed of one or more conditions, separated by
+logical operators &amp;&amp; and ||, and grouped together with
+parentheses where needed. The following conditions are available:
+<P>
+<UL>
+<LI><EM>option(opt)</EM>
+
+
+: True if option <EM>opt</EM> is found in the original packet.</LI>
+<LI><EM>flags(flag)</EM>
+
+
+: True if <EM>flag</EM> is enabled in the TCP header flags.</LI>
+<LI><EM>flags(flag1&amp;flag2&amp;...)</EM>
+
+
+: True if all the specified flags are enabled in the TCP header flags.</LI>
+<LI><EM>flags(flag1|flag2|...)</EM>
+
+
+: True if at least one of the specified flags is enabled in the
+TCP header flags.</LI>
+<LI><EM>ack(val)</EM>
+
+
+: True if the TCP header ACK field has the value <EM>val</EM>.</LI>
+<LI><EM>listen</EM>
+
+
+: True if the destination port is listening on the local host.</LI>
+</UL>
+<P>
+<P>
+<P>The language has several instructions to handle the internal state
+of the virtual machine:
+<P>
+<UL>
+<LI><EM>copy(opt)</EM>
+
+
+
+
+: This copies the <EM>opt</EM> option from the original packet
+to the options buffer of the state of the virtual machine,
+if such an option is found in the original packet.</LI>
+<LI><EM>insert(opt, val)</EM>
+
+
+
+
+
+
+
+
+This inserts the <EM>opt</EM> option in the options buffer,
+with the specified value. A numeric value can be passed, or an
+expression like <EM>this + &lt;number&gt;</EM> which will give the
+option its original value incremented of the specified value. Only the
+<EM>mss</EM>, <EM>wscale</EM> and <EM>timestamp</EM> (in that case
+"this" means the current value usable as a local timestamp) options
+are supported by this instruction.</LI>
+<LI><EM>insert(opt)</EM>
+
+: same as <EM>insert(opt, this)</EM>.</LI>
+<LI><EM>set(arg, val)</EM>
+
+
+
+
+
+
+
+
+
+
+
+: This sets one of the internal registers of the virtual machine. The
+available registers are <EM>flags</EM>, <EM>df</EM>, <EM>win</EM> and
+<EM>ack</EM>. For <EM>flags</EM>, the argument must be a valid
+combination of TCP flags, like for the tests. The <EM>df</EM> and
+<EM>win</EM> registers can have their value defined relatively to the
+original packet value by using the <EM>this + &lt;number&gt;</EM>
+construct seen above. This is also available for the <EM>ack</EM>
+register but then the final value is relative to the original packet
+sequence number (and not to its <EM>ack</EM> value).</LI>
+<LI>
+
+
+
+
+<EM>drop</EM>, <EM>accept</EM>, and <EM>reply</EM>: These
+instructions stop execution of the program by respectively dropping
+the packet, let it pass it to next rule, and build an answer from the
+virtual machine state and send it back. The default action is
+<EM>accept</EM> at the end of the code.</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>Hence, such a language allows one to precisely define behavior to
+reorder options, and also to generate appropriate replies for
+pathological tests from network analysis tools.
+<P>
+<P>But we can notice the following points:
+<P>
+<UL>
+<LI>
+
+
+
+
+Since the code in the <EM>tcp_option</EM> subsection only
+applies to options reordering, only the options buffer from the state
+of the virtual machine is used after running the program. Hence the
+<EM>listen</EM> and <EM>ack</EM> tests, and the <EM>insert</EM>, <EM>set</EM>, <EM>drop</EM>,
+<EM>reply</EM> instructions have little interest in this case.</LI>
+<LI>
+
+
+The options supported by the different tests and conditions were
+extracted from various RFCs specifiyng them; here are the names of the
+supported ones:
+<EM>eol</EM>, <EM>nop</EM>, <EM>mss</EM>, <EM>wscale</EM>,
+<EM>sackOK</EM>, <EM>sack</EM>, <EM>echo</EM>, <EM>echoreply</EM>,
+<EM>timestamp</EM>, <EM>pocOK</EM>, <EM>pocSP</EM>, <EM>CC</EM>,
+<EM>CC.NEW</EM>, <EM>CC.ECHO</EM>, <EM>acreq</EM>, <EM>acdata</EM>.</LI>
+<LI>
+
+
+The TCP flags supported by the different tests and conditions
+span the whole 12 bits usable and are coded with the following names:
+(from the lowest bit to the highest one): 
+<EM>fin</EM>, <EM>syn</EM>, <EM>rst</EM>, <EM>push</EM>, <EM>ack</EM>,
+<EM>urg</EM>, <EM>ece</EM>, <EM>cwr</EM>, <EM>bog1</EM>,
+<EM>bog2</EM>, <EM>bog3</EM>, <EM>bog4</EM>.</LI>
+</UL>
+<P>
+<HR>
+<A HREF="ippersonality-en-5.html">Next</A>
+<A HREF="ippersonality-en-3.html">Previous</A>
+<A HREF="ippersonality-en.html#toc4">Contents</A>
+</BODY>
+</HTML>

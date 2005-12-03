@@ -1,0 +1,71 @@
+README for the Linux IP Personality patch
+-----------------------------------------
+
+* What's that thing ?
+
+The Linux IP Personality patch adds to your Linux 2.4 kernel the
+ability to have different 'personalities' network wise, that is to
+change some characteristics of its network traffic, depending on
+different parameters (anything you can specify in an iptables rule:
+src/dst IP address, TCP or UDP port, etc.)
+
+The characteristics that can be changed are:
+ - TCP Initial Sequence Number (ISN)
+ - TCP initial window size
+ - TCP options (their types, values and order in the packet)
+ - IP ID numbers
+ - answers to some pathological TCP packets
+ - answers to some UDP packets
+They are deeply configurable.
+
+The primary objective of this patch is to counter network
+fingerprinting techniques, as described in Fyodor's article:
+  http://www.insecure.org/nmap/nmap-fingerprinting-article.html
+Fyodor is the author of nmap, the famous port scanner that has a
+powerful remote OS detection engine. Our patch can fool current
+versions of nmap, and is very configurable, so that he can probably
+fool any similar tool. The patch allows us to emulate the behaviour of
+any system listed in nmap's list of OS fingerprints. Some of the
+features of our patch can be applied to routed traffic, and thus
+disturb scans directed to machines we are routing. Some features (eg
+TCP ISN rewriting) can be used to improve network security.
+
+This patch relies on the wonderful framework created by Rusty Russel:
+netfilter. More precisely, our patch adds a new iptables target (in a
+kernel module) that can be used in the mangle table with a (patched)
+iptables.
+
+* Requirements:
+
+Sources of:
+ - Linux 2.4.18
+ - iptables 1.2.2
+And some knowledge of netfilter, iptables and Internet protocols (IP,
+TCP, UDP).
+
+We hope you are testing this on a spare machine or have good backups:
+this is EXPERIMENTAL kernel software, we are no kernel gurus, this may
+destroy your entire system without prior notice. Don't blame us if you
+lose all your data, you have been warned !
+
+* Install, configuration: see INSTALL
+
+* Authors & Disclaimers:
+
+The Linux IP Personality patch was developped at ENSERB (engineering
+school in computer sciences) as an end of studies project by Gaël
+Roualland and Jean-Marc Saffroy, directed by Anne Facq (CRPP) and
+Laurent Facq (REAUMUR/Universite Bordeaux I).
+
+It is licensed through the GNU General Public License. Read the
+COPYING file for the complete license.
+
+#include <stddisclaimer>
+
+* Contact:
+
+Ippersonality-devel mailing-list:
+  <ippersonality-devel@lists.sourceforge.net>
+
+Project Homepage: 
+  http://ippersonality.sourceforge.net

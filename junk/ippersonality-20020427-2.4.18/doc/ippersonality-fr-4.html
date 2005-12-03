@@ -1,0 +1,743 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Configuration</TITLE>
+ <LINK HREF="ippersonality-fr-5.html" REL=next>
+ <LINK HREF="ippersonality-fr-3.html" REL=previous>
+ <LINK HREF="ippersonality-fr.html#toc4" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-5.html">Page suivante</A>
+<A HREF="ippersonality-fr-3.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc4">Table des matières</A>
+<HR>
+<H2><A NAME="s4">4. Configuration</A></H2>
+
+<P>
+<P>
+<P>La configuration de PERS s'effectue en espace utilisateur &agrave; l'aide de
+la commande <EM>iptables</EM> et d'une biblioth&egrave;que dynamique associ&eacute;e
+permettant de lui  passer tous ses param&egrave;tres sp&eacute;cifiques. Cette
+biblioth&egrave;que ajoute &agrave; <EM>iptables</EM> de nouvelles options applicables
+&agrave; chaque r&egrave;gle dont la cible est PERS&nbsp;; l'une de ces options
+permet l'utilisation d'un fichier de configuration  d&eacute;taill&eacute;
+regroupant l'ensemble des param&egrave;tres n&eacute;cessaires &agrave; l'&eacute;mulation d'un
+syst&egrave;me d'exploitation particulier. Via l'utilisation de fichiers de
+configuration diff&eacute;rents pour chaque r&egrave;gle diff&eacute;rente on peut donc
+tr&egrave;s librement choisir d'&eacute;muler un syst&egrave;me particulier en fonction
+d'adresses sources et destinations, de l'interface, et autres crit&egrave;res
+de s&eacute;lection dans les r&egrave;gles.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H2><A NAME="ss4.1">4.1 Options en ligne de commande</A>
+</H2>
+
+<P>
+<P>Les options de la ligne commande sont pass&eacute;es &agrave; la cible lors de
+l'ajout d'une r&egrave;gle l'utilisant par exemple avec une syntaxe du
+type&nbsp;:
+<P>
+<P>
+<P>
+<P><CODE>iptables -A &lt;chaine&gt; -s &lt;source&gt; -d &lt;destination&gt; -j PERS &lt;options&gt;</CODE>
+<P>[Se r&eacute;f&eacute;rer &agrave; la documentation d'<EM>iptables</EM> pour plus de
+d&eacute;tails sur la syntaxe globale]
+<P>
+<P>
+<P>Les options reconnues par la biblioth&egrave;que sont&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>-tweak {src|dst}</EM>
+&nbsp;: Cette option permet de sp&eacute;cifier le sens de
+r&eacute;&eacute;criture pour la r&egrave;gle consid&eacute;r&eacute;e. Si elle vaut src cela
+signifie que l'on souhaite prot&eacute;ger la source des paquets (et ainsi on
+va par exemple r&eacute;&eacute;crire les num&eacute;ros de s&eacute;quence des paquets d'une
+connexion). Si elle vaut dst, alors on souhaite prot&eacute;ger la
+destination de la r&egrave;gle (et ainsi on r&eacute;&eacute;crirait par exemple les
+acquittements de la connexion).
+
+
+
+
+</LI>
+<LI><EM>-local</EM>
+&nbsp;: Cete option sp&eacute;cifie que la source ou la
+destination de la r&egrave;gle (selon la valeur de l'option tweak) est
+locale, ce qui a pour effet d'activer les modules "decoy" et "udp"
+(si ceux-ci sont d&eacute;finis dans le fichier de configuration) permettant
+ainsi de tromper compl&egrave;tement des outils de type nmap en local.
+
+
+
+</LI>
+<LI><EM>-conf</EM> 
+<EM>&lt;fichier&gt;</EM>&nbsp;: Cette option permet de sp&eacute;cifier le
+fichier de configuration &agrave; utiliser pour le syst&egrave;me &eacute;mul&eacute; au sein de
+cette r&egrave;gle (cf ci apr&egrave;s).
+
+</LI>
+</UL>
+<P>
+<H2><A NAME="ss4.2">4.2 Fichier de configuration</A>
+</H2>
+
+<P>
+<P>
+<P>Les param&egrave;tres concernant l'&eacute;mulation d'un syst&egrave;me particulier se
+d&eacute;finissent au sein d'un fichier. Ce fichier utilise une syntaxe
+proche de named.conf, inspir&eacute;e du langage C. Les options de
+configuration sont regroup&eacute;es dans des blocs (d&eacute;limit&eacute;s par des { et
+}) et chaque bloc de configuration correspond &agrave; un type de r&eacute;&eacute;criture
+diff&eacute;rent. Chaque option est constitu&eacute;e d'un identifiant suivi d'un
+ou plusieurs arguments et termin&eacute;e par un symbole ;.
+Les options et les blocs peuvent &ecirc;tre sp&eacute;cifi&eacute;s dans n'importe quel ordre.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Identification </H3>
+
+<P>
+<P>
+<P>Le premier &eacute;l&eacute;ment d'un fichier de configuration est une
+identification du syst&egrave;me qu'il d&eacute;crit. Il s'agit d'une cha&icirc;ne d'au
+plus 20 caract&egrave;res d&eacute;crivant le syst&egrave;me. La syntaxe est la suivante&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+ id "FakeOS";
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H3>Param&egrave;tres g&eacute;n&eacute;riques TCP</H3>
+
+<P>
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e <EM>tcp</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp {
+    incoming yes;
+    outgoing no;
+    max-window 65536;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Le param&egrave;tre <EM>incoming</EM> d&eacute;finit si l'on souhaite activer les
+modifications op&eacute;rant sur des connexions TCP (ISN, taille de fen&ecirc;tre,
+et Options) pour les connexions entrantes vers la zone prot&eacute;g&eacute;e. Il
+peut prendre les valeurs <EM>yes</EM> ou <EM>no</EM>.
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>outgoing</EM> est analogue pour les connexions
+sortantes de la zone prot&eacute;g&eacute;e.
+<P>
+<P>
+<P>Le param&egrave;tre <EM>max-window</EM> contr&ocirc;le la r&eacute;&eacute;criture de la taille de
+fen&ecirc;tre sur les paquets TCP des connexions correpondant aux r&eacute;glages
+pr&eacute;c&eacute;dents. Si il est d&eacute;fini &agrave; une valeur non nulle, alors pour toute
+nouvelle connexion dont la taille de fen&ecirc;tre lui est sup&eacute;rieure, un
+d&eacute;calage est calcul&eacute; et la taille de fen&ecirc;tre est ramen&eacute;e &agrave; une valeur
+inf&eacute;rieure &agrave; ce param&egrave;tre sur toute la dur&eacute;e de la connexion.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Param&egrave;tres de g&eacute;n&eacute;rateur de num&eacute;ros de s&eacute;quence</H3>
+
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e <EM>tcp_isn</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_isn {
+    type random-inc 10000;
+    initial-value 2600;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Le param&egrave;tre <EM>type</EM> d&eacute;crit le type de g&eacute;n&eacute;rateur &agrave; &eacute;muler ainsi
+qu'une &eacute;ventuelle option de cet &eacute;mulation. Les types suivants sont
+impl&eacute;ment&eacute;s&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>fixed-inc &lt;number&gt;</EM>
+&nbsp;: Il s'agit du g&eacute;n&eacute;rateur le plus
+simple. Le num&eacute;ro de s&eacute;quence initial de chaque connexion est tout
+simplement incr&eacute;ment&eacute; d'une valeur constante (pass&eacute;e en argument) &agrave;
+chaque nouvelle connexion. L'utilisation de la valeur 0 comme
+incr&eacute;ment permet d'&eacute;muler les syst&egrave;mes utilisant des num&eacute;ros de
+s&eacute;quence initiaux constants.
+
+
+
+</LI>
+<LI><EM>random-inc &lt;number&gt;</EM>
+&nbsp;: Il s'agit d'un g&eacute;n&eacute;rateur
+semi-al&eacute;atoire. A chaque nouvelle connexion le num&eacute;ro de s&eacute;quence
+initial est incr&eacute;ment&eacute; d'une valeur al&eacute;atoire entre 0 et le
+param&egrave;tre fourni. C'est le type de g&eacute;n&eacute;rateur utilis&eacute; sur les
+syst&egrave;mes Linux, FreeBSD, etc... La robustesse d'un tel g&eacute;n&eacute;rateur est
+d&eacute;termin&eacute; par la taille du param&egrave;tre.
+
+
+
+
+</LI>
+<LI><EM>true-random</EM>
+&nbsp;: Il s'agit d'un g&eacute;n&eacute;rateur compl&egrave;tement
+al&eacute;atoire. A chaque nouvelle connexion, le num&eacute;ro de s&eacute;quence est
+g&eacute;n&eacute;r&eacute; de mani&egrave;re purement al&eacute;atoire (en utilisant le g&eacute;n&eacute;rateur
+al&eacute;atoire &agrave; entropie variable du noyau).
+
+
+</LI>
+<LI><EM>builtin</EM>
+&nbsp;: Il s'agit du g&eacute;n&eacute;rateur de base du syst&egrave;me
+courant. Sous Linux il s'agit donc d'un g&eacute;r&eacute;rateur &agrave; incr&eacute;ments
+al&eacute;atoires.
+
+</LI>
+<LI><EM>time-dep &lt;number&gt;</EM>
+&nbsp;: Il s'agit d'un g&eacute;n&eacute;rateur
+d&eacute;pendant du temps. Le nombre pass&eacute; en param&egrave;tre indique la fr&eacute;quence
+de progression du g&eacute;n&eacute;rateur (en Hz). Par exemple, une valeur de
+25000 permet d'impl&eacute;menter le g&eacute;n&eacute;rateur d&eacute;crit dans la RFC 793&nbsp;:
+le num&eacute;ro de s&eacute;quence initial est alors incr&eacute;ment&eacute; de 1 toutes les 4
+micro-secondes. (la granularit&eacute; du g&eacute;n&eacute;rateur d&eacute;pend toutefois de la
+pr&eacute;csion des "ticks" du syst&egrave;me, 100 Hz par d&eacute;faut sous linux/x86)
+
+
+
+
+
+</LI>
+</UL>
+<P>Le param&egrave;tre <EM>initial-value</EM> d&eacute;crit la valeur initiale &agrave; utiliser
+pour le g&eacute;n&eacute;rateur de num&eacute;ro de s&eacute;quence. Il peut s'agir d'une valeur
+num&eacute;rique ou bien du mot-cl&eacute; <EM>random</EM> qui choisira une valeur
+al&eacute;atoire lors de l'insertion de la r&egrave;gle.
+Ce param&egrave;tre a peu d'importance pour les types de g&eacute;n&eacute;rateurs peu
+pr&eacute;dictibles.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Param&egrave;tres de g&eacute;n&eacute;rateur d'Identifiants IP</H3>
+
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e <EM>ip_id</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  ip_id {
+    type broken-inc 1;
+    initial-value 2600;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Le param&egrave;tre <EM>type</EM> d&eacute;crit le type de g&eacute;n&eacute;rateur &agrave; &eacute;muler ainsi
+qu'une &eacute;ventuelle option de cet &eacute;mulation. Les m&ecirc;me types que pour les
+g&eacute;n&eacute;rateurs de num&eacute;ros de s&eacute;quences sont accept&eacute;s, et un choix
+suppl&eacute;mentaire, <EM>broken-inc number</EM> est disponible&nbsp;: il s'agit
+d'un compteur incr&eacute;ment&eacute; de la valeur sp&eacute;cifi&eacute;e &agrave; chaque utilisation,
+mais dont le r&eacute;sultat est stoqu&eacute; dans le paquet au format "little
+endian", au lieu de l'ordre r&eacute;seau.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Param&egrave;tres de r&eacute;&eacute;ordonnancement des options</H3>
+
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e <EM>tcp_options</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_options {
+    keep-unknown yes;
+    keep-unused no;
+    isolated-packets yes;
+    timestamp-scale 100;
+    code {
+      &lt;code...>
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Cette section d&eacute;finit comment les options TCP d'un paquet doivent &ecirc;tre
+r&eacute;&eacute;crites. La sous-section <EM>code</EM> contient un programme dans un langage
+proche du C (d&eacute;crit par la suite) qui est compil&eacute; par le module
+<EM>libipt_PERS.so</EM>. Ce code est pass&eacute; &agrave; la machine virtuelle qui
+remplit le buffer d'options constituant son &eacute;tat au fer et &agrave; mesure de
+l'ex&eacute;cution. Lorsque l'ex&eacute;cution est achev&eacute;e, le buffer d'options
+r&eacute;sultant est utilis&eacute; pour remplacer les options initiales du
+paquet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>keep-unknown</EM> sp&eacute;cifie si les options "inconnues"
+pr&eacute;sentes dans le paquet initial, et donc non manipulables par le
+programme de r&eacute;&eacute;criture, doivent &ecirc;tre rajout&eacute;es &agrave; la fin du buffer
+final afin d'&ecirc;tre pr&eacute;sentes dans le paquet final. Ce param&egrave;tre peut
+prendre les valeurs <EM>yes</EM> ou <EM>no</EM>.
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>keep-unused</EM> sp&eacute;cifie si les options du paquet
+original qui n'ont pas &eacute;t&eacute; utilis&eacute;es (test&eacute;es ou recopi&eacute;es)
+pendant l'ex&eacute;cution du programme doivent &ecirc;tre recopi&eacute;es &agrave; la fin du
+buffer afin d'&ecirc;tre pr&eacute;sentes dans le paquet final. Ce param&egrave;tre peut
+prendre les valeurs <EM>yes</EM> ou <EM>no</EM>. Ceci permet d'utiliser un
+code assez simple pour r&eacute;ordonner seulement quelques options tout en
+conservant toutes les options du paquet original.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>isolated-packets</EM> sp&eacute;cifie si la r&eacute;&eacute;criture des
+options doit &ecirc;tre appliqu&eacute;e aux paquets n'appartenant &agrave; aucune
+connexion connue. Ce param&egrave;tre peut prendre les valeurs <EM>yes</EM>
+ou <EM>no</EM> (valeur par d&eacute;faut).
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>timestamp-scale</EM> sp&eacute;cifie si l'on souhaite
+changer la valeur des "timestamp" TCP dans les paquets communiquant
+avec la machine locale. Il prend en argument la fr&eacute;quence &agrave; utiliser
+pour les nouveaux "timestamp". (si la valeur est nulle ou &eacute;gale &agrave; la
+fr&eacute;quence nominale, l'option est ignor&eacute;e).
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Param&egrave;tres du leurre TCP</H3>
+
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e <EM>tcp_decoy</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_decoy {
+    code {
+      &lt;code...>
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Cette section se r&eacute;sume &agrave; une sous-section <EM>code</EM> analogue &agrave; celle
+de la section pr&eacute;c&eacute;dente, qui d&eacute;finit un certain nombre de tests &agrave;
+effectuer sur le paquet initial afin de reconna&icirc;tre des paquets
+caract&eacute;ristiques d'outils de d&eacute;tection et de r&eacute;pondre en cons&eacute;quence. Le
+langage utilis&eacute; est le m&ecirc;me que pr&eacute;c&eacute;demment (d&eacute;crit ci apr&egrave;s).
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Param&egrave;tres du leurre UDP</H3>
+
+<P>
+<P>Ces param&egrave;tres sont regroup&eacute;s au sein d'une section nomm&eacute;e
+<EM>udp_unreach</EM>.
+Exemple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  udp_unreach {
+    reply yes;
+    df no;
+    max-len 56;
+    tos 0;
+  
+    mangle-original {
+      ip-len 21;
+      ip-id same;
+      ip-csum zero;
+      udp-len 308;
+      udp-csum zero;
+      udp-data same;
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Le param&egrave;tre <EM>reply</EM> d&eacute;termine si l'on souhaite &eacute;mettre un message
+ICMP de type "port unreachable" lorsque l'on re&ccedil;oit un message UDP
+pour un port non ouvert localement. Il peut &ecirc;tre d&eacute;fini &agrave; <EM>yes</EM> ou
+&agrave; <EM>no</EM>. Les autres param&egrave;tres de cette section s'appliquent si il
+est activ&eacute;.
+<P>
+<P>
+<P>
+<P>
+<P>Le param&egrave;tre <EM>df</EM> sp&eacute;cifie si le bit "Don't Fragment" de
+l'ent&ecirc;te IP du paquet ICMP doit &ecirc;tre activ&eacute; ou non.
+<P>
+<P>
+<P>Le param&egrave;tre <EM>max-len</EM> sp&eacute;cifie la longueur maximum du message
+ICMP g&eacute;n&eacute;r&eacute; en r&eacute;ponse.
+<P>
+<P>
+<P>Le param&egrave;tre <EM>tos</EM> sp&eacute;cifie la valeur du champ "Type Of service"
+dans l'ent&ecirc;te IP du paquet ICMP retourn&eacute;.
+<P>
+<P>
+<P>Lors de l'envoi d'un message ICMP de type "port unreachable", une
+portion du paquet initial est retourn&eacute;e dans le message. La section
+<EM>mangle-original</EM> permet de d&eacute;finir des modifications de cette
+portion du message initial. Elle comprend les param&egrave;tres
+suivants&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>ip-len {same|&lt;number&gt;}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au champ longueur de l'ent&ecirc;te IP du paquet initial. Peut
+valoir <EM>same</EM> (dans ce cas la valeur est inchang&eacute;e) ou une valeur
+num&eacute;rique (dans ce cas elle remplace la valeur initiale).
+
+
+</LI>
+<LI><EM>ip-id {same|mangle|zero}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au champ id de l'ent&ecirc;te IP du paquet initial. Peut
+valoir <EM>same</EM>, <EM>zero</EM> (la valeur est mise &agrave; z&eacute;ro),
+<EM>mangle</EM> (la valeur est chang&eacute;e pour une valeur diff&eacute;rente).
+
+
+
+
+</LI>
+<LI><EM>ip-csum {same|mangle|zero}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au champ checksum de l'ent&ecirc;te IP du paquet initial. Peut
+valoir <EM>same</EM>, <EM>zero</EM>, <EM>mangle</EM>.
+
+
+</LI>
+<LI><EM>udp-len {same|&lt;number&gt;}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au champ longueur de l'ent&ecirc;te UDP du paquet initial. Peut
+valoir <EM>same</EM> ou une valeur num&eacute;rique.
+
+
+</LI>
+<LI><EM>udp-csum {same|mangle|zero}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au champ checksum de l'ent&ecirc;te UDP du paquet initial. Peut
+valoir <EM>same</EM>, <EM>zero</EM>, <EM>mangle</EM>.
+
+
+
+</LI>
+<LI><EM>udp-data {same|mangle|zero}</EM>
+&nbsp;: d&eacute;finit les modifications
+&agrave; apporter au premier octet de la zone de donn&eacute;e du paquet UDP
+initial. Peut valoir <EM>same</EM>, <EM>zero</EM>,
+<EM>mangle</EM>.
+
+
+
+</LI>
+</UL>
+<P>
+<H2><A NAME="ss4.3">4.3 Langage</A>
+</H2>
+
+<P>
+<P>Les sections <EM>tcp_options</EM> et
+<EM>tcp_decoy</EM> poss&egrave;dent toutes
+deux un param&egrave;tre code pouvant contenir un programme. Comme vu
+pr&eacute;c&eacute;demment, ce programme est compil&eacute; par la biblioth&egrave;que dynamique
+de <EM>iptables</EM> dans un pseudo-code interp&eacute;t&eacute; au sein du module noyau par une machine
+virtuelle simple. Celle-ci op&egrave;re sur un paquet TCP en entr&eacute;e et g&egrave;re un &eacute;tat
+interne. Son &eacute;tat est compos&eacute; de&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<UL>
+<LI>Un buffer de stockage d'options TCP</LI>
+<LI>Plusieurs "registres"&nbsp;: <EM>flags</EM>, <EM>mss</EM>, <EM>wscale</EM>,
+<EM>win</EM>, <EM>ack</EM> et <EM>df</EM> correspondants aux champs TCP du
+m&ecirc;me nom pour un &eacute;ventuel paquet de r&eacute;ponse.
+
+
+</LI>
+</UL>
+<P>Le code de la section <EM>tcp_options</EM> est appliqu&eacute; &agrave; un paquet TCP
+entrant, et en fin de programme, le buffer d'options dans l'&eacute;tat de la
+machine virtuelle est utilis&eacute; comme nouvelle liste d'options TCP pour
+le paquet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Le code de la section <EM>tcp_decoy</EM> est &eacute;galement appliqu&eacute; &agrave; un
+paquet TCP entrant, mais le paquet n'est pas modifi&eacute;. En fonction du
+type de terminaison du programme, un nouveau paquet peut &ecirc;tre
+construit &agrave; partir de l'&eacute;tat de la machine virtuelle et renvoy&eacute; &agrave; la
+source du paquet initial. Le paquet inital peut aussi &ecirc;tre rejet&eacute;, ou
+continuer son cheminement normal au sein de la cible.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Ces programmes peuvent &ecirc;tre d&eacute;crits avec un langage de syntaxe proche
+du C. Des test conditionnels peuvent &ecirc;tre effectu&eacute;s sur le paquet initial
+afin de g&eacute;rer le comportement en fonction de son contenu.
+<P>
+<P>
+<P>
+<P>Un test a l'allure g&eacute;n&eacute;rale suivante&nbsp;:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  if (test) {
+    &lt;action>
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+
+ou
+<BLOCKQUOTE><CODE>
+<PRE>
+  if (test) {
+    &lt;action>
+  } else {
+    &lt;action>
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Un test est constitu&eacute; d'une ou plusieurs conditions, s&eacute;par&eacute;es par les
+op&eacute;rateurs &amp;&amp; et ||, et group&eacute;es par des parenth&egrave;ses si
+besoin. Les conditions reconnues par le langage sont&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>option(opt)</EM>
+&nbsp;: Vrai si l'option <EM>opt</EM> est pr&eacute;sente dans le paquet
+initial.
+</LI>
+<LI><EM>flags(flag)</EM>
+&nbsp;: Vrai si <EM>flag</EM> est activ&eacute; dans le paquet
+initial.
+</LI>
+<LI><EM>flags(flag1&amp;flag2&amp;...)</EM>
+&nbsp;: Vrai si tous les flags sp&eacute;cifi&eacute;s sont activ&eacute;s dans le
+paquet initial.
+</LI>
+<LI><EM>flags(flag1|flag2|...)</EM>
+&nbsp;: Vrai si au moins un des flags sp&eacute;cifi&eacute;s est activ&eacute; dans le
+paquet initial.
+
+</LI>
+<LI><EM>ack(val)</EM>
+&nbsp;: Vrai si le champ acquittement de l'ent&ecirc;te TCP du paquet
+initial vaut <EM>val</EM>.
+</LI>
+<LI><EM>listen</EM>
+&nbsp;: Vrai si le port destination du paquet initial est
+ouvert sur la machine locale.
+</LI>
+</UL>
+<P>Le langage dispose de plusieurs instructions afin de manipuler
+l'&eacute;tat interne de la machine virtuelle&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>copy(opt)</EM>
+&nbsp;: Ceci provoque la copie de l'option <EM>opt</EM>
+du paquet initial vers le buffer d'options de l'&eacute;tat interne de la
+machine virtuelle si une telle option est disponible dans le paquet
+initial.
+
+
+</LI>
+<LI><EM>insert(opt, val)</EM>
+&nbsp;: Ceci permet d'ins&eacute;rer une option dans
+le buffer d'&eacute;tat en sp&eacute;cifiant sa valeur pr&eacute;cisement. Une valeur
+num&eacute;rique peut &ecirc;tre pass&eacute;e, ou alors une expression de type <EM>this
++ &lt;number&gt;</EM> qui aura pour effet de donner &agrave; l'option la valeur
+qu'elle a dans le paquet initial ajout&eacute;e &agrave; la valeur sp&eacute;cifi&eacute;e.
+Cette instruction ne supporte que les options <EM>mss</EM>,
+<EM>wscale</EM> et <EM>timestamp</EM> (dans ce cas la valeur "this"
+correspond &agrave; la valeur courante utilisable pour le timestamp local).
+
+
+
+
+
+
+</LI>
+<LI><EM>insert(opt)</EM>
+&nbsp;: &eacute;quivalent &agrave; <EM>insert(opt, this)</EM>.
+</LI>
+<LI><EM>set(arg, val)</EM>
+&nbsp;: Ceci permet de d&eacute;finir un des registres
+internes de la machine virtuelle. Les registres utilisables sont
+<EM>flags</EM>, <EM>df</EM>, <EM>win</EM> et <EM>ack</EM>. Pour le registre
+<EM>flags</EM>, l'argument doit &ecirc;tre une combinaison valide de flags
+TCP comme pour les tests. Les arguments <EM>df</EM> et <EM>win</EM>
+peuvent avoir leur valeur d&eacute;finie relativement &agrave; leur valeur dans le
+paquet initial en utilisant la construction <EM>this +
+&lt;number&gt;</EM> vue pr&eacute;c&eacute;demment.
+Cette construction est &eacute;galement valable pour le param&egrave;tre
+<EM>ack</EM> mais dans ce cas la valeur finale est relative au num&eacute;ro
+de s&eacute;quence initial (et non &agrave; son num&eacute;ro d'acquitement).
+
+
+
+
+
+
+
+
+</LI>
+<LI><EM>drop</EM>, <EM>accept</EM>, et <EM>reply</EM>&nbsp;: Ces instructions
+provoquent l'arr&ecirc;t du traitement du code en entrainant respectivement
+un abandon du paquet, une continuation de traitement au sein de la
+cible, et l'envoi d'une r&eacute;ponse construite &agrave; partir de l'&eacute;tat de la
+machine virtuelle. L'action par d&eacute;faut en fin de programme est <EM>accept</EM>.
+
+
+
+
+</LI>
+</UL>
+<P>Ce langage permet donc simplement de d&eacute;finir les comportements pour
+r&eacute;ordonnancer les options ainsi que pour g&eacute;n&eacute;rer des r&eacute;ponses sur
+mesure &agrave; des tests pathologiques pour tromper les outils de d&eacute;tection
+de syst&egrave;mes d'exploitation.
+<P>
+<P>
+<P>
+<P>On peut faire les remarques suivantes&nbsp;:
+<P>
+<P>
+<UL>
+<LI>Compte tenu que le code de la section <EM>tcp_option</EM> n'agit
+que sur les options afin de le r&eacute;ordonner,
+seul le buffer d'option de l'&eacute;tat de la machine virtuelle est utilis&eacute;
+suite &agrave; l'ex&eacute;cution du code. En cons&eacute;quence les tests <EM>listen</EM> et
+<EM>ack</EM>, et les instructions <EM>insert</EM>, <EM>set</EM>, <EM>drop</EM>,
+<EM>reply</EM>, bien que valides, y ont peu d'int&ecirc;ret.
+
+
+
+
+</LI>
+<LI>Les options support&eacute;es par les diff&eacute;rents tests et conditions
+sont tir&eacute;es des diff&eacute;rentes RFC les d&eacute;taillant&nbsp;; en voivi les
+noms&nbsp;:
+
+
+
+<EM>eol</EM>, <EM>nop</EM>, <EM>mss</EM>, <EM>wscale</EM>,
+<EM>sackOK</EM>, <EM>sack</EM>, <EM>echo</EM>, <EM>echoreply</EM>,
+<EM>timestamp</EM>, <EM>pocOK</EM>, <EM>pocSP</EM>, <EM>CC</EM>,
+<EM>CC.NEW</EM>, <EM>CC.ECHO</EM>, <EM>acreq</EM>, <EM>acdata</EM>.</LI>
+<LI>Les flags TCP support&eacute;s par les diff&eacute;rents tests englobent la
+totalit&eacute; des 12 bits utilisables et sont repr&eacute;sent&eacute;s par les noms
+suivants (du bit de poids faible au bit de poids fort)&nbsp;:
+
+
+
+<EM>fin</EM>, <EM>syn</EM>, <EM>rst</EM>, <EM>push</EM>, <EM>ack</EM>,
+<EM>urg</EM>, <EM>ece</EM>, <EM>cwr</EM>, <EM>bog1</EM>,
+<EM>bog2</EM>, <EM>bog3</EM>, <EM>bog4</EM>.</LI>
+</UL>
+<P>
+<HR>
+<A HREF="ippersonality-fr-5.html">Page suivante</A>
+<A HREF="ippersonality-fr-3.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc4">Table des matières</A>
+</BODY>
+</HTML>

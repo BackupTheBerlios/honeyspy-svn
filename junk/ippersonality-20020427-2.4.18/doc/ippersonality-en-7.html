@@ -1,0 +1,395 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Development Tools</TITLE>
+ <LINK HREF="ippersonality-en-8.html" REL=next>
+ <LINK HREF="ippersonality-en-6.html" REL=previous>
+ <LINK HREF="ippersonality-en.html#toc7" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-en-8.html">Next</A>
+<A HREF="ippersonality-en-6.html">Previous</A>
+<A HREF="ippersonality-en.html#toc7">Contents</A>
+<HR>
+<H2><A NAME="s7">7. Development Tools</A></H2>
+
+<P>
+<P>
+<H2><A NAME="ss7.1">7.1 Debugging</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>In order to track the module execution, some information can be
+printed by the module in the kernel message buffer while processing
+packets. By default, debug is disabled but it can be enabled with a
+sysctl, through the <EM>/proc/sys/net/ipv4/ip_personality_debug</EM>
+file.
+<P>
+<P>
+<P>
+<P>
+<P>The debug level is defined by the value of this parameter:
+individual bits are associated to submodules, allowing to select
+precisely debugging messages by combining wanted bits as follows:
+<P>
+<UL>
+<LI><EM>1</EM>
+
+: Target core</LI>
+<LI><EM>2</EM>
+
+: ISN rewriting</LI>
+<LI><EM>4</EM>
+
+: Options reordering</LI>
+<LI><EM>8</EM>
+
+: Window scaling</LI>
+<LI><EM>16</EM>
+
+: Local TCP Decoy</LI>
+<LI><EM>32</EM>
+
+: Virutal Machine</LI>
+<LI><EM>64</EM>
+
+: Local UDP Decoy</LI>
+<LI><EM>128</EM>
+
+: IP ID rewriting</LI>
+</UL>
+<P>
+<P>Example:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  echo 35 > /proc/sys/net/ipv4/ip_personality_debug
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H2><A NAME="ss7.2">7.2 Osdet</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Osdet is a test tool trying to guess the OS of a remote host. It
+is based on nmap sources and uses the same tests, but it performs
+them sequentially while displaying replies it receives (with code from
+tcpdump). This allows one to see how the reply was potentially changed.
+<P>
+<P>Sample usage:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+dse1:~# osdet -h
+usage: osdet [-t n[-N],...] [-p port] [-P port] [-S ip] [-h] host
+  -p port    Sets openport (defaults to 23 (telnet)).
+  -P port    Sets closedport (defaults to a random high port).
+  -S ip      Sets source Ip for scans if multihomed.
+  -t ...     Selects a subset of tests to perform.
+
+dse1:~# osdet -p 23 -P 234 dse2
+OSDET v0.3 [using nmap backend version 2.53]
+
+Trying to detect remote os of dse2 [172.20.30.2].
+(assuming port 23 is open and port 234 is closed)
+Using pcap filter: (icmp and dst host 172.20.30.1) or
+ (tcp and src host 172.20.30.2 and dst host 172.20.30.1)
+
+* Test 1 (TCP to open port, SYN and BOGUS)
+  Sending packet... ok:
+    172.20.30.1.50925 > 172.20.30.2.23: S 26F7D60A:26F7D60A(0) win 3072
+     &lt;wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 36252)
+  Waiting for answer... ok:
+    172.20.30.2.23 > 172.20.30.1.50925: S 6ECE0057:6ECE0057(0) ack 26F7D60B
+    win 7950 &lt;mss 266> (ttl 255, id 59900)
+
+* Test 2 (TCP to open port, NULL)
+  Sending packet... ok:
+    172.20.30.1.50926 > 172.20.30.2.23: . win 3072 &lt;wscale 10,nop,mss
+    265, timestamp 3F3F3F3F 0,eol> (ttl 54, id 27188)
+  Waiting for answer... no reply.
+
+* Test 3 (TCP to open port, SYN, FIN, URG and PUSH)
+  Sending packet... ok:
+    172.20.30.1.50927 > 172.20.30.2.23: SFP 26F7D60A:26F7D60A(0) win
+    3072 urg 0 &lt;wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 28956)
+  Waiting for answer... ok:
+    172.20.30.2.23 > 172.20.30.1.50927: . ack 2 win 7950 (ttl 255, id 60156)
+
+* Test 4 (TCP to open port, ACK 0)
+  Sending packet... ok:
+    172.20.30.1.50928 > 172.20.30.2.23: . ack 0 win 3072 &lt;wscale
+    10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 7360)
+  Waiting for answer... ok:
+    172.20.30.2.23 > 172.20.30.1.50928: R 0:0(0) win 8192 (ttl 255, id 60412)
+
+* Test 5 (TCP to closed port, SYN)
+  Sending packet... ok:
+    172.20.30.1.50929 > 172.20.30.2.234: S 26F7D60A:26F7D60A(0) win
+    3072 &lt;wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 49268)
+  Waiting for answer... ok:
+    172.20.30.2.234 > 172.20.30.1.50929: R 0:0(0) ack 26F7D60B win 0 (ttl 255, id 60668)
+
+* Test 6 (TCP to closed port, ACK 0)
+  Sending packet... ok:
+    172.20.30.1.50930 > 172.20.30.2.234: . ack 0 win 3072 &lt;wscale
+    10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 53356)
+  Waiting for answer... ok:
+    172.20.30.2.234 > 172.20.30.1.50930: R 0:0(0) win 0 (ttl 255, id 60924)
+
+* Test 7 (TCP to closed port, FIN, PUSH and URG)
+  Sending packet... ok:
+    172.20.30.1.50931 > 172.20.30.2.234: FP 26F7D60A:26F7D60A(0) win
+    3072 urg 0 &lt;wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 60119)
+  Waiting for answer... ok:
+    172.20.30.2.234 > 172.20.30.1.50931: R 0:0(0) ack 26F7D60A win 0 (ttl 255, id 61180)
+
+* Test 8 (UDP to closed port, expecting ICMP unreach)
+  Sending packet... ok:
+    172.20.30.1.50932 > 172.20.30.2.234: udp 300 (ttl 60, id 36334)
+  Waiting for answer... ok:
+    172.20.30.2 > 172.20.30.1: icmp: 172.20.30.2 udp port 234 unreachable (ttl 255, id 61436)
+
+* Test 9 (Initial Sequence Number)
+  Sending paquets... 26F7D60B 26F7D60C 26F7D60D 26F7D60E 26F7D60F 26F7D610; last is:
+    172.20.30.1.50939 > 172.20.30.2.23: S 26F7D610:26F7D610(0) win 3072 (ttl 54, id 777)
+  Waiting for answers... 9D128940[1] 9D138340[2] 9D147D40[3] 9D157740[4] 9D167140[5]
+    9D176B40[6]; last is:
+    172.20.30.2.23 > 172.20.30.1.50939: S 9D176B40:9D176B40(0) ack
+    26F7D611 win 32120 &lt;mss 1460> (DF) (ttl 64, id 0)
+
+* Nmap OS Fingerprint:
+  TSeq(Class=64K)
+  T1(Resp=Y%DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=N)
+  T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+  T4(Resp=Y%DF=N%W=2000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+
+  TCP Sequence Prediction: Class=64K rule
+  Difficulty=1 (Trivial joke)
+
+* Remote OS Guess: AmigaOS AmiTCP/IP 4.3
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H2><A NAME="ss7.3">7.3 Perscc</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The iptables modules associated with IP Personality has to parse
+the config file and compile the pseudo code. In order to test its
+parsing and generated code, we developed a standalone config file
+parser/compiler/desassembler. This tool can also be used to check a
+config file before using it.
+<P>
+<P>Sample usage:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+dse2:~# percc example.conf
+=== config ===
+id: Example
+isn initialized: yes, value=877764155
+isn type: true-random
+rewrite way: ingoing outgoing
+keep unknown options: yes
+keep unused options: yes
+max window: 0
+change options for isolated packets: yes
+udp-unreach:
+  reply: yes
+  df: yes
+  max-len: 500
+  tos: 0
+  ip-len: 0
+  ip-id: same
+  ip-csum: same
+  udp-len: 0
+  udp-csum: same
+  udp-data: mangle
+
+=== interpreted code #0 ===
+if (flags(syn)) {
+  if (option(sackOK)) {
+    copy(sackOK);
+  } else {
+    copy(nop);
+    copy(nop);
+  }
+  copy(timestamp);
+  copy(mss);
+} else {
+  if (option(sack)) {
+    copy(sack);
+  } else {
+    copy(nop);
+    copy(nop);
+  }
+  copy(timestamp);
+}
+code: 15 instructions.
+
+=== compiled code #0 ===
+0000:  [01100002]  TEST    tcp_flags, syn
+0001:  [0200000B]  JMP     000B
+0002:  [01000004]  TEST    tcp_option, sackOK
+0003:  [02000006]  JMP     0006
+0004:  [03000004]  PUT     sackOK (copy)
+0005:  [02000008]  JMP     0008
+0006:  [03000001]  PUT     nop (copy)
+0007:  [03000001]  PUT     nop (copy)
+0008:  [03000008]  PUT     timestamp (copy)
+0009:  [03000002]  PUT     mss (copy)
+000A:  [02000012]  JMP     0012
+000B:  [01000005]  TEST    tcp_option, sack
+000C:  [0200000F]  JMP     000F
+000D:  [03000005]  PUT     sack (copy)
+000E:  [02000011]  JMP     0011
+000F:  [03000001]  PUT     nop (copy)
+0010:  [03000001]  PUT     nop (copy)
+0011:  [03000008]  PUT     timestamp (copy)
+asm: 18 instructions.
+
+=== interpreted code #1 ===
+if (option(mss)) {
+  set(df, 0);
+  if (listen) {
+    if (flags(syn&amp;ece)) {
+      set(win, 7950);
+      set(ack, this + 1);
+      set(flags, syn|ack);
+      insert(mss, this + 1);
+      reply;
+    } 
+    if (flags(null)) {
+      drop;
+    } 
+    if (flags(fin&amp;syn&amp;urg&amp;push)) {
+      set(win, 7950);
+      set(ack, 2);
+      set(flags, ack);
+      reply;
+    } 
+    if ((ack(0) &amp;&amp; flags(ack)) &amp;&amp; !flags(syn|urg|push|rst)) {
+      set(win, 8192);
+      set(ack, 2);
+      set(flags, rst);
+      reply;
+    } 
+  } else {
+    set(win, 0);
+    if (flags(syn) &amp;&amp; !flags(ack)) {
+      set(ack, this + 1);
+      set(flags, ack|rst);
+      reply;
+    } 
+    if ((ack(0) &amp;&amp; flags(ack)) &amp;&amp; !flags(syn|urg|push|rst)) {
+      set(ack, 2);
+      set(flags, rst);
+      reply;
+    } 
+    if (flags(fin&amp;urg&amp;push)) {
+      set(ack, this + 0);
+      set(flags, ack|rst);
+      reply;
+    } 
+  }
+} 
+code: 53 instructions.
+
+=== compiled code #1 ===
+0000:  [01000002]  TEST    tcp_option, mss
+0001:  [0200003A]  JMP     003A
+0002:  [04200000]  SET     df, 0
+0003:  [01400000]  TEST    listen
+0004:  [02000022]  JMP     0022
+0005:  [01200042]  TEST    tcp_flags, syn&amp;ece
+0006:  [0200000D]  JMP     000D
+0007:  [04301F0E]  SET     win, 7950
+0008:  [04900001]  SET     ack, this + 1
+0009:  [04000012]  SET     flags, syn|ack
+000A:  [04C00001]  SET     mss, this + 1
+000B:  [03100002]  PUT     mss (insert)
+000C:  [05000003]  RET     reply
+000D:  [01100000]  TEST    tcp_flags, null
+000E:  [02000010]  JMP     0010
+000F:  [05000002]  RET     drop
+0010:  [0120002B]  TEST    tcp_flags, fin&amp;syn&amp;urg&amp;push
+0011:  [02000016]  JMP     0016
+0012:  [04301F0E]  SET     win, 7950
+0013:  [04100002]  SET     ack, 2
+0014:  [04000010]  SET     flags, ack
+0015:  [05000003]  RET     reply
+0016:  [01300000]  TEST    ack, 0
+0017:  [0200003A]  JMP     003A
+0018:  [01100010]  TEST    tcp_flags, ack
+0019:  [0200003A]  JMP     003A
+001A:  [0110002E]  TEST    tcp_flags, syn|urg|push|rst
+001B:  [0200001D]  JMP     001D
+001C:  [0200003A]  JMP     003A
+001D:  [04302000]  SET     win, 8192
+001E:  [04100002]  SET     ack, 2
+001F:  [04000004]  SET     flags, rst
+0020:  [05000003]  RET     reply
+0021:  [0200003A]  JMP     003A
+0022:  [04300000]  SET     win, 0
+0023:  [01100002]  TEST    tcp_flags, syn
+0024:  [0200002B]  JMP     002B
+0025:  [01100010]  TEST    tcp_flags, ack
+0026:  [02000028]  JMP     0028
+0027:  [0200002B]  JMP     002B
+0028:  [04900001]  SET     ack, this + 1
+0029:  [04000014]  SET     flags, ack|rst
+002A:  [05000003]  RET     reply
+002B:  [01300000]  TEST    ack, 0
+002C:  [02000035]  JMP     0035
+002D:  [01100010]  TEST    tcp_flags, ack
+002E:  [02000035]  JMP     0035
+002F:  [0110002E]  TEST    tcp_flags, syn|urg|push|rst
+0030:  [02000032]  JMP     0032
+0031:  [02000035]  JMP     0035
+0032:  [04100002]  SET     ack, 2
+0033:  [04000004]  SET     flags, rst
+0034:  [05000003]  RET     reply
+0035:  [01200029]  TEST    tcp_flags, fin&amp;urg&amp;push
+0036:  [0200003A]  JMP     003A
+0037:  [04900000]  SET     ack, this + 0
+0038:  [04000014]  SET     flags, ack|rst
+0039:  [05000003]  RET     reply
+asm: 58 instructions.
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<HR>
+<A HREF="ippersonality-en-8.html">Next</A>
+<A HREF="ippersonality-en-6.html">Previous</A>
+<A HREF="ippersonality-en.html#toc7">Contents</A>
+</BODY>
+</HTML>

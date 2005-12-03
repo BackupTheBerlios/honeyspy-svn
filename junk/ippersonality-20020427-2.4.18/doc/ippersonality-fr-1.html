@@ -1,0 +1,73 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Introduction</TITLE>
+ <LINK HREF="ippersonality-fr-2.html" REL=next>
+
+ <LINK HREF="ippersonality-fr.html#toc1" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-2.html">Page suivante</A>
+Page précédente
+<A HREF="ippersonality-fr.html#toc1">Table des matières</A>
+<HR>
+<H2><A NAME="s1">1. Introduction</A></H2>
+
+<P>
+<P>En dehors des comportements specifi&eacute;s par les  RFC, chaque pile
+TCP/IP poss&egrave;de ses propres sp&eacute;cificit&eacute;s (choix d'impl&eacute;mentation,
+bugs, am&eacute;liorations, ...) en particulier concernant la mani&egrave;re de
+r&eacute;agir face aux paquets anormaux, c'est &agrave; dire ne respectant pas les
+RFC.
+<P>Ces sp&eacute;cificit&eacute;s sont exploit&eacute;es par des logiciels afin de deviner, &agrave;
+distance via le r&eacute;seau, quel syst&egrave;me d'exploitation
+tourne sur une machine donn&eacute;e. Ils fonctionnent en &eacute;mettant des
+paquets anormaux (en jouant notamment sur la fragmentation, les flags
+TCP, les champs inutilis&eacute;s, la taille des paquets, ...) &agrave; destination
+des machines cibles, et analysent les r&eacute;ponses en les comparant &agrave; une base de
+comportements connus des diff&eacute;rents syst&egrave;mes d'exploitation. 
+<P>Ces logiciels sont utilis&eacute;s par les administrateurs r&eacute;seau pour
+recenser leurs parcs h&eacute;t&eacute;rog&egrave;nes de machines, mais aussi par les
+pirates qui cherchent &agrave; apprendre le maximum d'informations sur une
+machine ou un r&eacute;seau de machines pour adapter leurs attaques et
+maximiser leurs chances de r&eacute;ussite.
+<P><EM>IP Personality</EM> est un module pour <EM>netfilter</EM> dont l'objectif
+est de pouvoir &eacute;muler diff&eacute;rentes "personalit&eacute;s" r&eacute;seau, en changeant
+les caract&eacute;ristiques du traffic r&eacute;seau, selon diff&eacute;rents
+param&egrave;tres. En particulier cela permet de tromper de tels outils en
+faisant passer un syst&egrave;me pour un autre, afin par exemple de masquer
+ou de prot&eacute;ger des syst&egrave;mes autrement vuln&eacute;rables, ou encore pour
+mettre en place des "pots de miel" (honey pots).
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<HR>
+<A HREF="ippersonality-fr-2.html">Page suivante</A>
+Page précédente
+<A HREF="ippersonality-fr.html#toc1">Table des matières</A>
+</BODY>
+</HTML>

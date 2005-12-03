@@ -1,0 +1,379 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: IP Personality</TITLE>
+ <LINK HREF="ippersonality-en-4.html" REL=next>
+ <LINK HREF="ippersonality-en-2.html" REL=previous>
+ <LINK HREF="ippersonality-en.html#toc3" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-en-4.html">Next</A>
+<A HREF="ippersonality-en-2.html">Previous</A>
+<A HREF="ippersonality-en.html#toc3">Contents</A>
+<HR>
+<H2><A NAME="s3">3. IP Personality</A></H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Considering the above restrictions, we have chosen a solution based on
+<EM>netfilter</EM> and <EM>iptables</EM>: the latter provides the
+mangle table, designed to enable modifications on packets (contrary to the
+filter and nat tables, designed for filtering and address
+translation). Consequently, we created the new PERS (as IP
+Personality) target, which can rewrite packets in several ways. The
+rules let <EM>iptables</EM> select IP packets according to their
+source and destination address and port, and the parameters passed to
+the PERS target alter its behaviour, which can be tuned by the
+administrator to define how a class of packets should be rewritten.
+<P>
+<P>
+<H2><A NAME="ss3.1">3.1 Features</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Once installed and configured properly, IP Personality makes it
+possible to fool nmap into believing that the host runs an operating
+system freely specified by the administrator. Most test packets sent
+by nmap are abnormal, and the others are sent to closed ports,
+therefore they have no influence on the local TCP/IP stack: consequently
+we can divert them without worry, and send the replies that suit to
+our needs. The PERS configuration covers a large set of possible
+answers, thus we can send back to nmap packets which are specific to
+any kind of system described in nmap's OS fingerprint list.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Some of the operations intended to deceive nmap (not all of them,
+though) can also be applied to packets that are routed by the
+host. Even though we lose the capacity to completeley lure nmap, our
+modifications are efficient enough to prevent it from detecting the OS
+running on its target. The operations we can apply to routed packets
+are TCP sequence numbers and options rewriting.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>By the way, some rewriting operations can improve robustness in some
+cases. In particular, the hosts with weak ISN generators are
+vulnerable to sequence number prediction attacks, and they can be
+protected by our target, which offers a truly random ISN. Furthermore,
+thanks to the versatility offered by the syntax of the  configuration
+file, the possibilities for emulation are not limited to existing
+network fingerprinting tools: it becomes very easy to fool, or at
+least disturb any tool that relies on the same tricks as nmap, since
+we can control the elements that make a packet typical.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>In order to handle all the possible behaviors of an IP stack, the
+configuration is done through an external config file describing
+values for several parameters. This file is parsed and loaded in
+kernel space with an extension to <EM>netfilter</EM>'s configuration
+tool, <EM>iptables</EM>. In particular, for cases difficult to
+emulate, that configuration file contains two "code" sections that are
+interpreted in the kernel (as pseudo-code) in order to analyse
+packets more precisely with algorithms similar to those of the
+emulated operating systems.
+<P>
+<P>
+<H2><A NAME="ss3.2">3.2 The journey of a packet in PERS</A>
+</H2>
+
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+                             +----->---->---+----+--->---->-----+
+                             | +---&lt;----&lt;---| VM |---&lt;----&lt;---+ |
+                             | |            +----+            | |
+                          +--+-+--+                           | |
+                      +->-| Decoy |->-+                       | |
+                      |   +-------+   | +-----+   +-----+   +-+-+-+
+                +-->--+->--->--->--->-+-| SEQ |->-| WIN |->-| OPT |-+
++-----------+   | TCP                   +-----+   +-----+   +-----+ |
+| IP Tables |->-+                                                   |--+
++-----------+   | UDP         +---------+                           |  |
+     |          +-->---->-----| Unreach |------>------>-------------+  |
+     |                        +---------+                              |
+     +-------&lt;---------&lt;--------&lt;---------&lt;----------&lt;----------&lt;------+
+
+              &lt;==================== IP Personality ====================>
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>The PERS target can modifiy the packets it receives from the
+<EM>netfilter</EM> architecture. Therefore it is used in the mangle
+table, which is meant to enable packet modification.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>This table has access to two of <EM>netfilter</EM>'s hooks,
+PRE_ROUTING and LOCAL_OUT. So as to be able to rewrite
+connections correctly, the PERS module needs to track each
+connection's packets in both directions (we will explain why later).
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>To achieve this, we use a pair of rules configured identically, except
+that their source and destination criteria are symmetric. For routed
+packets, both rules must be on the PRE_ROUTING hook, since
+packets of both directions come from hosts other than the local
+machine. By contrast, even though the traffic sent to the local
+machine uses the PRE_ROUTING hook, responses are sent via
+LOCAL_OUT.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>In every rule used to rewrite a class of traffic, there is an option
+to tell the module whether it should protect the source or the
+destination of the packet, since some rewriting operations are done
+differently depending on the packet's direction.
+<P>
+<P>
+<H3>TCP packets</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>If the packet is sent to the local machine (this is an option of our
+target), it is first sent to the decoy generation code: here the
+pseudo-code of the tcp_decoy section of the configuration file
+decides whether the packet can continue as is, or (if the
+packet has been found to be abnormal) whether we have to send back a
+decoy based on the packet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>If the packet continues, it can be modified in different ways. In
+particular, the direction, which can be determined with information
+provided by <EM>iptable</EM>'s conntrack module and with parameters of
+the current rule, defines how the packet is rewritten. The possible
+modifications are:
+<P>
+<P>
+<UL>
+<LI>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<B>sequence numbers rewriting:</B> we want to be able to
+simulate initial sequence number generators, and at the same time we
+want that steps following the establishment of a connection work
+properly. Therefore we need to rewrite the sequence and
+acknowledgement numbers in all packets of a connection for which the ISN has
+been modified. The first rewriting is done when the ISN is chosen by
+one of the generators in PERS (the configuration file defines a
+generator and its parameters); at this time, the difference between
+the original ISN and the one generated by PERS is saved. As this
+difference between the sequence numbers used by both sides remains
+constant, we can simply add it to the sequence numbers in one way and
+subtract it from acknowledgement numbers in the other way;
+
+</LI>
+<LI>
+
+
+
+
+
+
+
+<B>window size rewriting:</B> since the initial window size is a
+characteristic element, we want to be able to control it. But as for
+sequence numbers, once we have set a limit, we must enforce it for all
+the packets of the connection;
+
+</LI>
+<LI>
+
+
+
+
+
+
+
+
+
+
+
+
+<B>options rewriting:</B> when a connection is established, both IP
+stacks exchange useful information by the use of options: they
+are optionnal fields in the TCP header, that lie between the regular
+header and the payload of the packet. The supported options and the
+order in which they appear is a characteristic we can tweak: this is
+done by interpreting the pseudo-code from the tcp_options subsection of
+the configuration file. This code tests the type and values of options
+and the flags of the TCP header, and then builds a new option buffer to
+replace the original one.
+</LI>
+</UL>
+<P>
+<H3>UDP packets</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>UDP packets that are simply routed are ignored. However, packets for
+the local machine are analysed to check if their destination port is
+listening: if that's the case, they are left as is; otherwise, they
+are dropped and PERS is then responsible for emitting an ICMP Port
+Unreachable message packet because nmap will check it.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>This kind of message is made of an IP packet with an ICMP header,
+followed by the beginning of the original packet that generated the
+message. The configuration file allows one to control each part of the
+generated reply packet that nmap uses to identify the OS.
+<P>
+<P>
+<H3>Common part for IP packets</H3>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>After the potential changes in UDP/TCP packets, all IP packets can
+also be modified. Right now, only one change can be done : tweaking
+the IP ID number using a value generated with a defined method, just
+like for the TCP ISN.
+<P>
+<P>
+<HR>
+<A HREF="ippersonality-en-4.html">Next</A>
+<A HREF="ippersonality-en-2.html">Previous</A>
+<A HREF="ippersonality-en.html#toc3">Contents</A>
+</BODY>
+</HTML>

@@ -1,0 +1,379 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: IP Personality</TITLE>
+ <LINK HREF="ippersonality-fr-4.html" REL=next>
+ <LINK HREF="ippersonality-fr-2.html" REL=previous>
+ <LINK HREF="ippersonality-fr.html#toc3" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-4.html">Page suivante</A>
+<A HREF="ippersonality-fr-2.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc3">Table des matières</A>
+<HR>
+<H2><A NAME="s3">3. IP Personality</A></H2>
+
+<P>
+<P>
+<P>Au vu des contraintes pr&eacute;c&eacute;dentes, nous avons donc opt&eacute; pour une
+solution bas&eacute;e sur <EM>netfilter</EM> et <EM>iptables</EM> &nbsp;: en effet, l'architecte
+d'<EM>iptables</EM> a pr&eacute;vu une table mangle, justement pr&eacute;vue pour les
+manipulations de paquets (par opposition aux tables filter et
+nat, pr&eacute;vues pour le filtrage et la translation d'adresse,
+respectivement). Nous avons donc cr&eacute;&eacute; une nouvelle target PERS
+(pour IP Personality), qui effectue certaines op&eacute;rations de r&eacute;&eacute;criture
+sur les paquets qu'on lui passe. Le syst&egrave;me des r&egrave;gles permet de
+laisser &agrave; <EM>iptables</EM> le soin de s&eacute;lectionner les paquets IP en fonction
+de leurs adresses et ports source et destination, et les param&egrave;tres
+pass&eacute;s &agrave; la target PERS lui donnent un comportement variable, r&eacute;glable
+par l'administrateur, qui peut ainsi d&eacute;finir quel type de r&eacute;&eacute;criture
+il veut voir appliquer &agrave; une cat&eacute;gorie de paquets.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H2><A NAME="ss3.1">3.1 Fonctionnalit&eacute;s</A>
+</H2>
+
+<P>
+<P>
+<P>Une fois install&eacute; et configur&eacute; correctement, IP Personality
+offre la possibilit&eacute; de leurrer nmap, et de lui faire
+croire que la machine h&ocirc;te fait tourner un syst&egrave;me librement sp&eacute;cifi&eacute;
+par l'administrateur. Les paquets de test qu'envoie nmap sont pour
+la plupart anormaux, et ceux qui ne le sont pas sont envoy&eacute;s &agrave; des
+ports ferm&eacute;s, donc ils n'influencent pas l'&eacute;tat de la pile TCP/IP
+locale&nbsp;: nous pouvons donc les d&eacute;tourner sans scrupule, et &eacute;mettre les
+r&eacute;ponses qui nous conviennent. Le syst&egrave;me de configuration de PERS
+permet de couvrir tout l'&eacute;ventail des possibilit&eacute;s de r&eacute;ponses, et
+ainsi nous pouvons renvoyer &agrave; nmap des paquets caract&eacute;ristiques
+de n'importe quel syst&egrave;me d&eacute;crit dans sa base de signatures.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Certaines des op&eacute;rations effectu&eacute;es pour leurrer nmap (pas
+toutes h&eacute;las) peuvent &eacute;galement &ecirc;tre ex&eacute;cut&eacute;es sur des paquets rout&eacute;s
+par notre machine. Si nous perdons la capacit&eacute; de tromper compl&egrave;tement
+nmap, nos manipulations sont suffisamment efficaces pour
+l'emp&ecirc;cher de d&eacute;tecter le syst&egrave;me utilis&eacute; sur sa cible. Les op&eacute;rations
+possibles sur des paquets rout&eacute;s sont la r&eacute;&eacute;criture des num&eacute;ros de
+s&eacute;quence et des options TCP.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Au passage, nous gagnons &eacute;galement en robustesse dans le cas de
+certaines r&eacute;&eacute;critures. En particulier, les machines dont les
+g&eacute;n&eacute;rateurs d'ISN trop simplistes les rendent vuln&eacute;rables &agrave; des
+attaques par pr&eacute;diction de num&eacute;ros de s&eacute;quence peuvent ainsi &ecirc;tre
+prot&eacute;g&eacute;es par notre target, qui leur offre un ISN parfaitement
+al&eacute;atoire. De plus, gr&acirc;ce &agrave; la souplesse qu'offre la syntaxe du
+fichier de configuration, les possibilit&eacute;s d'&eacute;mulations ne sont pas
+limit&eacute;es aux outils de prise d'empreintes r&eacute;seau existants&nbsp;: il
+devient tr&egrave;s facile sinon de tromper, du moins de perturber n'importe
+quel outil raisonnant sur les m&ecirc;mes bases que nmap, puisque nous
+avons le contr&ocirc;le des &eacute;l&eacute;ments caract&eacute;ristiques d'un paquet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Pour tenir compte des nombreuses possibilit&eacute;s de comportement d'une
+pile IP, la configuration s'effectue via un fichier de configuration
+complet d&eacute;taillant les valeurs de diff&eacute;rents param&egrave;tres. Ce fichier
+est interpr&eacute;t&eacute; et charg&eacute; dans l'espace noyau via une extension au
+programe de configuration de <EM>netfilter</EM>, <EM>iptables</EM>.
+En particulier, pour les cas de r&eacute;&eacute;critures complexes d&eacute;pendant de
+nombreux param&egrave;tres, le fichier contient deux sections de "code"
+qui sont interpr&eacute;t&eacute;s dans le noyau (sous forme de pseudo code) pour
+analyser plus finement les paquets selon des algorithmes analogues
+aux syst&egrave;mes &eacute;mul&eacute;s.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H2><A NAME="ss3.2">3.2 Trajet d'un paquet dans PERS</A>
+</H2>
+
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+                             +----->---->---+----+--->---->-----+
+                             | +---&lt;----&lt;---| VM |---&lt;----&lt;---+ |
+                             | |            +----+            | |
+                          +--+-+--+                           | |
+                      +->-| Decoy |->-+                       | |
+                      |   +-------+   | +-----+   +-----+   +-+-+-+
+                +-->--+->--->--->--->-+-| SEQ |->-| WIN |->-| OPT |-+
++-----------+   | TCP                   +-----+   +-----+   +-----+ |
+| IP Tables |->-+                                                   |--+
++-----------+   | UDP         +---------+                           |  |
+     |          +-->---->-----| Unreach |------>------>-------------+  |
+     |                        +---------+                              |
+     +-------&lt;---------&lt;--------&lt;---------&lt;----------&lt;----------&lt;------+
+
+              &lt;==================== IP Personality ====================>
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>La cible PERS peut modifier les paquets qui lui sont pass&eacute;s
+par l'architecture <EM>netfilter</EM>. Aussi, il est logique de l'utiliser
+au sein de la table mangle sp&eacute;cialis&eacute;e dans la modification des
+paquets.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Cette table acc&egrave;de &agrave; deux des points d'entr&eacute;e de <EM>netfilter</EM>,
+PRE_ROUTING et LOCAL_OUT. Afin de pouvoir
+r&eacute;&eacute;crire correctement les connexions, le module PERS a besoin de
+voir les deux sens d'une connexion (nous verrons pourquoi par la
+suite).
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Pour ce faire, on utilise deux r&egrave;gles configur&eacute;es de mani&egrave;re
+identique mais dont les crit&egrave;res sources et destinations sont
+sym&eacute;triques. Pour les paquets rout&eacute;s, les deux r&egrave;gles doivent se situer
+au le point d'entr&eacute;e PRE_ROUTING, puisque les paquets des
+deux directions sont d'origine ext&eacute;rieure &agrave; la machine locale. En
+revanche en ce qui concerne les communications avec la machine locale,
+si les paquets qui lui sont envoy&eacute;s passent bien par le point d'entr&eacute;e
+PRE_ROUTING, il n'en est pas de m&ecirc;me pour les paquets qu'elle
+&eacute;met, ceux ci passant par LOCAL_OUT.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Pour chacune des r&egrave;gles utilis&eacute;es pour r&eacute;&eacute;crire un type de
+communication, on pr&eacute;cise au module si l'on souhaite prot&eacute;ger la
+destination de la r&egrave;gle ou sa source &agrave; l'aide d'une option. En effet
+selon le sens du paquet, certaines r&eacute;&eacute;critures ne sont pas faites de la
+m&ecirc;me mani&egrave;re.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Cas d'un paquet TCP</H3>
+
+<P>
+<P>
+<P>Si le paquet est destin&eacute; &agrave; la machine locale (c'est une option de la
+target), on commence par l'envoyer dans le code de g&eacute;n&eacute;ration des
+leurres&nbsp;: l&agrave; le pseudo-code de la section tcp_decoy du fichier de
+config d&eacute;termine si le paquet peut continuer tel quel, ou sinon
+(c'est-&agrave;-dire si le paquet a &eacute;t&eacute; identifi&eacute; comme &eacute;tant pathologique),
+s'il faut r&eacute;pondre, avec un leurre construit en fonction du paquet.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Si le paquet continue, il peut &ecirc;tre modifi&eacute; de plusieurs fa&ccedil;ons. En
+particulier, le sens de circulation, qu'on peut d&eacute;terminer gr&acirc;ce aux
+informations du module conntrack d'<EM>iptables</EM> et aux param&egrave;tres
+de la r&egrave;gle en cours, d&eacute;finit le sens de la r&eacute;&eacute;criture. Les alt&eacute;rations
+possibles sont&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<UL>
+<LI>
+<B>la r&eacute;&eacute;criture des num&eacute;ros de s&eacute;quence&nbsp;:</B> si l'on veut
+pouvoir simuler des g&eacute;n&eacute;rateurs de num&eacute;ros de s&eacute;quence initiaux, on
+veut aussi que ce qui suit l'&eacute;tablissement d'une connexion fonctionne
+convenablement. Il faut donc r&eacute;&eacute;crire les num&eacute;ros de s&eacute;quence et
+d'acquittement de tous les paquets d'une connexion dont on a chang&eacute;
+l'ISN. La premi&egrave;re r&eacute;&eacute;criture se fait au moment du choix de l'ISN par
+l'un des g&eacute;n&eacute;rateurs de PERS (le fichier de configuration d&eacute;termine
+lequel et avec quels param&egrave;tres)&nbsp;: &agrave; ce moment, on sauvegarde la
+diff&eacute;rence entre l'ISN original et celui choisi par PERS.  Cette
+diff&eacute;rence entre les num&eacute;ros de s&eacute;quence utilis&eacute;s par les deux parties
+restant constante, il suffit de l'ajouter aux num&eacute;ros de s&eacute;quence dans
+un sens et de la soustraire aux acquittements dans l'autre&nbsp;;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</LI>
+<LI>
+<B>la r&eacute;&eacute;criture des tailles de fen&ecirc;tre&nbsp;:</B> la taille de
+fen&ecirc;tre initiale &eacute;tant un &eacute;l&eacute;ment caract&eacute;ristique, nous voulons
+pouvoir la contr&ocirc;ler. Mais comme dans le cas des num&eacute;ros de s&eacute;quence,
+il faut ensuite assumer ce choix et limiter la taille de fen&ecirc;tre en
+cons&eacute;quence&nbsp;;
+
+
+
+
+
+
+
+</LI>
+<LI>
+<B>la r&eacute;&eacute;criture des options&nbsp;:</B> lorsqu'une connexion est
+&eacute;tablie, les piles TCP &eacute;changent des informations utiles par le biais
+d'options&nbsp;: ce sont des champs optionnels de l'en-t&ecirc;te TCP, plac&eacute;s
+entre l'en-t&ecirc;te normale et les donn&eacute;es. Le type des options utilis&eacute;es
+et leur ordre est un &eacute;l&eacute;ment caract&eacute;ristique que nous pouvons
+modifier&nbsp;: c'est ce qui est fait en interpr&eacute;tant le pseudo-code de la
+section tcp_options. Ce code effectue des tests sur le type et
+la valeur des options, ainsi que sur les flags du paquet TCP, pour
+construire un nouveau bloc d'options qui remplace l'ancien dans le
+paquet TCP.
+
+
+
+
+
+
+
+
+
+
+
+</LI>
+</UL>
+<P>
+<H3>Cas d'un paquet UDP</H3>
+
+<P>
+<P>
+<P>Les paquets UDP qui sont simplement rout&eacute;s sont ignor&eacute;s. Ceux qui sont
+destin&eacute;s &agrave; la machine locale sont examin&eacute;s pour v&eacute;rifier qu'ils sont
+bien destin&eacute;s &agrave; un port UDP ouvert&nbsp;: si c'est bien le cas, ils
+continuent leur chemin tels quels&nbsp;; dans le cas contraire, ils sont
+d&eacute;truits et PERS prend en charge l'&eacute;mission d'un message ICMP de type
+"Port Unreachable", car nmap examine les caract&eacute;ristiques de
+ce message.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Ce genre de message est un paquet IP contenant une en-t&ecirc;te ICMP suivie
+du d&eacute;but du paquet IP ayant provoqu&eacute; l'erreur. Le fichier de
+configuration permet de contr&ocirc;ler chacun des &eacute;l&eacute;ments du paquet
+utilis&eacute;s par nmap pour identifier un syst&egrave;me.
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<H3>Partie commune des packets IP</H3>
+
+<P>
+<P>
+<P>Apr&egrave;s la r&eacute;&eacute;criture potentielle des paquets UDP/TCP, l'ensemble des
+paquets IP peuvent &eacute;galement &ecirc;tre modif&eacute;s. Une seule modification est
+apport&eacute;e pour le moment et consiste &agrave; modifier l'identifiant
+du paquet (IP ID) pour une valeur g&eacute;n&eacute;r&eacute;e selon un mod&egrave;le pr&eacute;d&eacute;fini
+(de mani&egrave;re analogue aux num&eacute;ros de s&eacute;quences TCP).
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<HR>
+<A HREF="ippersonality-fr-4.html">Page suivante</A>
+<A HREF="ippersonality-fr-2.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc3">Table des matières</A>
+</BODY>
+</HTML>

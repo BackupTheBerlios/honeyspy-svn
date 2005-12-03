@@ -1,0 +1,99 @@
+INSTALL intructions for the Linux IP Personality patch
+------------------------------------------------------
+
+0) Requirements:
+
+Sources of:
+ - Linux 2.4.18
+ - iptables 1.2.2
+
+1) Patch your kernel:
+
+$ cd linux
+$ patch -p1 < /foo/bar/kernel_patch
+
+2) Compile your kernel:
+
+You need to compile a kernel that supports iptables. A new netfilter
+option activates our patch: IP Personality Support (EXPERIMENTAL).
+
+  CONFIG_IP_NF_PERS=y
+
+The IP Personality support can also be set as a kernel module.
+
+  CONFIG_IP_NF_PERS=m
+
+For IP Personality Support to work, your kernel must be configured
+with iptables, conntrack and the mangle table.
+
+IMPORTANT: even if you want to compile IP Personality as a module, you
+will need to rebuild the kernel and the other netfilter modules,
+because we also patch connexion tracking.
+
+3) Patch your iptables:
+
+$ cd iptables-1.2.2/
+$ patch -p1 < /foo/bar/iptables_patch
+
+Note that the patch only adds source files for specific support
+of our target. The other features of iptables are not affected.
+
+4) Compile your iptables:
+
+Juste type:
+$ make
+or
+$ make KERNEL_DIR=/your/patched/kernel
+if your /usr/include links do not point to the patched kernel.
+
+This will compile a normal iptables with its libs, and a new lib:
+pers/libipt_PERS.so that will be installed with the other libs
+by running make install.
+
+5) Load the ipt_PERS.o module (if you compiled as a module):
+
+Simply:
+$ insmod ipt_PERS
+
+Note that if you use kmod, the module will automatically be loaded
+by the kernel when you set rules using it.
+
+6) Write your mangling rules using the new PERS target:
+
+Our PERS target accepts the following options:
+ - --tweak {src|dst}: define if our actions should dissimulate the
+ operating system of the source or the destination machine
+ - --local: indicates that the packet destination is the local
+ machine (needed by decoy)
+ - --conf <file>: specifies a config file, see the sample files to
+ get an idea of the syntax
+
+Examples:
+
+Say you have 2 machines A and B, separated by a Linux router, and you
+want B to look like an Amiga box from A. Then you could do the
+following on the router:
+
+$ iptables -t mangle -A PREROUTING -s B -d A -j PERS --tweak src \
+    --conf amigaos.conf
+$ iptables -t mangle -A PREROUTING -s A -d B -j PERS --tweak dst \
+    --conf amigaos.conf
+
+Now, say you want the router to look like a Windows box from A:
+
+$ iptables -t mangle -A PREROUTING -s B -d router -j PERS --tweak dst \
+    --local --conf win9x.conf
+$ iptables -t mangle -A OUTPUT -s router -d B -j PERS --tweak src \
+    --local --conf win9x.conf
+
+You can test your setup with the stock nmap or our modified version
+(osdet) available on the project homepage
+(http://ippersonality.sourceforge.net).
+
+Note that if you wish to hide the OS even after a full portscan you
+might have to enlarge the ip_conntrack table size by issuing a command
+like:
+
+$ echo 20480 > /proc/sys/net/ipv4/ip_conntrack_max
+
+Have fun!

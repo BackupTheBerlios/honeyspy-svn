@@ -1,0 +1,577 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Exemple</TITLE>
+ <LINK HREF="ippersonality-fr-6.html" REL=next>
+ <LINK HREF="ippersonality-fr-4.html" REL=previous>
+ <LINK HREF="ippersonality-fr.html#toc5" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-6.html">Page suivante</A>
+<A HREF="ippersonality-fr-4.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc5">Table des matières</A>
+<HR>
+<H2><A NAME="s5">5. Exemple</A></H2>
+
+<P>
+<P>
+<H2><A NAME="ss5.1">5.1 Fichier de configuration</A>
+</H2>
+
+<P>
+<P>Supposons que l'on souhaite r&eacute;aliser un fichier de configuration pour &eacute;muler un
+AmigaOS. Pour cela, on dispose de la signature nmap
+suivante (se r&eacute;f&eacute;rer &agrave; la documentation de nmap pour plus de d&eacute;tails)&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  Fingerprint AmigaOS AmiTCP/IP 4.3
+  TSeq(Class=64K)
+  T1(DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=N)
+  T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+  T4(DF=N%W=2000%ACK=O%Flags=R%Ops=)
+  T5(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Nous devons commencer la configuration par la d&eacute;finition d'un
+identifiant, comme suit&nbsp;:
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  id "AmigaOS";
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>On souhaite r&eacute;&eacute;crire les connexions TCP entrantes dans un premier
+temps, et ne pas agir sur les tailles de fen&ecirc;tres (simplement tromper
+nmap), aussi utilise-t-on des valeurs g&eacute;n&eacute;riques pour la section
+<EM>tcp</EM>.
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp {
+    incoming yes;
+    outgoing no;
+    max-window 32768;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>La ligne <EM>TSeq</EM> de la signature nmap d&eacute;finit le type de
+g&eacute;n&eacute;rateur de num&eacute;ro de s&eacute;quence initial utiliser. Le param&egrave;tre
+important en est la classe du g&eacute;n&eacute;rateur. On peut rencontrer les
+classes suivantes&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>Class=C</EM>
+&nbsp;: G&eacute;n&eacute;rateur constant, correspondant &agrave; <EM>fixed-inc
+0</EM>.
+</LI>
+<LI><EM>Class=TD</EM>
+&nbsp;: G&eacute;n&eacute;rateur d&eacute;pendant du temps. On peut l'&eacute;muler avec un g&eacute;n&eacute;rateur &agrave;
+incr&eacute;ment fixe faible de mani&egrave;re &agrave; satisfaire les param&egrave;tres
+<EM>gcd</EM> et <EM>si</EM>. Il n'y a pas d'heuristiques particuli&egrave;re
+pour cela, il faut donc essayer plusieurs valeurs diff&eacute;rentes.
+
+
+</LI>
+<LI><EM>Class=RI</EM>
+&nbsp;: G&eacute;n&eacute;rateur &agrave; incr&eacute;ments al&eacute;atoires. Ce g&eacute;n&eacute;rateur est
+&eacute;mul&eacute; avec le mode <EM>random-inc</EM>. L'intervalle de recherche
+al&eacute;atoire est d&eacute;termin&eacute; par la difficult&eacute; retourn&eacute;e par nmap
+(<EM>gcd</EM> et <EM>si</EM>). M&ecirc;me restrictions que pr&eacute;c&eacute;demment.
+
+
+</LI>
+<LI><EM>Class=TR</EM>
+&nbsp;: G&eacute;n&eacute;rateur parfaitement al&eacute;atoire. &eacute;mul&eacute; par <EM>true-random</EM>.
+</LI>
+<LI><EM>Class=i800</EM>, <EM>Class=64K</EM>
+&nbsp;: Incr&eacute;mentation fixes, respectivement de multiples de 800
+et de 64000.
+</LI>
+</UL>
+<P>Ici on utilisera donc&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_isn {
+    type fixed-inc 64000;
+    initial-value random;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Ensuite on trouve l'ensemble des tests TCP effectu&eacute;s par nmap au
+sein des lignes <EM>Tx</EM>. La syntaxe de ces lignes est toujours la
+m&ecirc;me et d&eacute;crit l'&eacute;ventuelle r&eacute;ponse re&ccedil;ue par nmap &agrave; son test.
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  Tx(Resp=Y%DF=Y%W=XXXX%ACK=S++%Flags=AS%Ops=M)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>La signification des diff&eacute;rents champs est la suivante&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>Resp</EM>
+&nbsp;: <EM>Y</EM> si une r&eacute;ponse a &eacute;t&eacute; re&ccedil;ue, <EM>N</EM> sinon.
+</LI>
+<LI><EM>DF</EM>
+&nbsp;: Indique si le bit "Don't Fragment" est positionn&eacute; dans la r&eacute;ponse
+</LI>
+<LI><EM>W</EM>
+&nbsp;: Indique la ou les tailles de fen&ecirc;tres (s&eacute;par&eacute;es par des
+"|") attendues dans la r&eacute;ponse.
+
+</LI>
+<LI><EM>ACK</EM>
+&nbsp;: Indique la valeur attendue pour l'acquittement dans la
+r&eacute;ponse. Peut valoir une valeur num&eacute;rique ou <EM>S</EM> pour indiquer
+le num&eacute;ro de s&eacute;quence du test, ou <EM>S++</EM> pour indiquer le
+num&eacute;ro de s&eacute;quence du test plus un.
+
+
+
+</LI>
+<LI><EM>Flags</EM>
+&nbsp;: Contient les flags TCP activ&eacute;s dans la r&eacute;ponse, sous la
+forme de leurs initiales repectives (<EM>A</EM> pour <EM>Ack</EM>,
+<EM>S</EM> pour <EM>Syn</EM>, ...).
+
+
+</LI>
+<LI><EM>Ops</EM>
+&nbsp;: Contient la liste des options pr&eacute;sentes suivant leur ordre au
+sein de la r&eacute;ponse, sous forme de leurs initiales
+repectives (<EM>M</EM> pour <EM>MSS</EM>, <EM>N</EM> pour
+<EM>NOP</EM>, ...) sauf pour <EM>E</EM> qui signifie que l'option
+pr&eacute;c&eacute;dente est de la m&ecirc;me valeur que dans le paquet de test.
+
+
+
+</LI>
+</UL>
+<P>Si l'on souhaite &eacute;muler le syst&egrave;me pr&eacute;cis&eacute;ment, il faut d&eacute;duire des
+diff&eacute;rents r&eacute;sultats l'ordre des options &agrave; partir des r&eacute;ponses que
+nmap re&ccedil;oit et des paquets initiaux auxquels elles
+correspondent. Ici, on n'a qu'une option donc la section correspondante
+est assez simple&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_options {
+    keep-unknown yes;
+    keep-unused no;
+    isolated-packets yes;
+    code {
+      copy(mss);
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>A ce stade le syst&egrave;me ressemble un peu &agrave; celui &eacute;mul&eacute;. En revanche
+sur les tests tr&egrave;s pr&eacute;cis, nos r&eacute;ponses ne statisferont pas nmap. Afin
+de le tromper compl&egrave;tement en local, on peut d&eacute;duire des r&eacute;sultats aux
+tests TCP les r&eacute;ponses &agrave; lui retourner au sein du mode <EM>decoy</EM>.
+Pour ce faire on utilise un "squelette" de code adapt&eacute; aux tests de
+nmap que l'on compl&egrave;te afin de g&eacute;n&eacute;rer les r&eacute;ponses
+attendues&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_decoy {
+    code {
+      if (option(mss)) {
+        if (listen) {
+          if (flags(syn&amp;ece)) {
+            /* nmap test 1 */
+          }
+          if (flags(null)) {
+            /* nmap test 2 */
+          } 
+          if (flags(syn&amp;fin&amp;urg&amp;push)) {
+            /* nmap test 3 */
+          }
+          if (ack(0) &amp;&amp; flags(ack) &amp;&amp; !flags(syn|push|urg|rst)) {
+            /* nmap test 4 *
+          }
+        } else {
+          if (flags(syn) &amp;&amp; !flags(ack)) {
+            /* nmap test 5 */
+          }
+          if (ack(0) &amp;&amp; flags(ack) &amp;&amp; !flags(syn|push|urg|rst)) {
+            /* nmap test 6 *
+          }
+          if (flags(fin&amp;push&amp;urg)) {
+            /* nmap test 7 */
+          }
+        }
+      }
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Et il n'y a plus qu'&agrave; &eacute;crire le code pour chaque test, par exemple
+pour le premier&nbsp;
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  set(df, 0);
+  set(win, 0x1F0E);
+  set(ack, this + 1);
+  set(flags, ack|syn);
+  insert(mss, this+1);
+  reply;
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>ou pour le second (pas de r&eacute;ponse)&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  drop;
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Enfin on peut &eacute;galement r&eacute;agir localement (au sein de la section
+<EM>udp_decoy</EM>) au dernier test de nmap,
+le test UDP port-unreach (<EM>PU</EM>), qui a la syntaxe suivante&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>La signification des diff&eacute;rents champs est la suivante&nbsp;:
+<P>
+<UL>
+<LI><EM>Resp</EM>
+&nbsp;: Comme pr&eacute;c&eacute;demment, correspond &agrave; l'option <EM>reply</EM>.
+</LI>
+<LI><EM>DF</EM>
+&nbsp;: Comme pr&eacute;c&eacute;demment, correspond &agrave; l'option <EM>df</EM>.
+</LI>
+<LI><EM>TOS</EM>
+&nbsp;: Type Of Service, correspond &agrave; l'option <EM>tos</EM>.
+</LI>
+<LI><EM>IPLEN</EM>
+&nbsp;: longueur du paquet ICMP. Peut-&ecirc;tre d&eacute;finie via l'option
+<EM>max-len</EM>.
+
+</LI>
+</UL>
+
+La r&eacute;ponse ICMP g&eacute;n&eacute;r&eacute;e contient le d&eacute;but du paquet original
+(comportement recommand&eacute; par les RFC). Nmap essaie de d&eacute;terminer si
+certaines portions en ont &eacute;t&eacute; chang&eacute;es au cours du traitement via les
+param&egrave;tres suivants, correspondants &agrave; ceux de la section
+<EM>mangle-original</EM>.
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>RID, RIPCK, UCK, DAT</EM>
+&nbsp;: Ces param&egrave;tres d&eacute;finissent les modifications apport&eacute;es &agrave;
+(respectivement) l'ID IP original, le checksum IP original, le
+checksum UDP original, les donn&eacute;es originales. Chacun de ces
+param&egrave;tres peut avoir une des trois valeurs suivantes&nbsp;:
+<EM>0</EM> (mis &agrave; z&eacute;ro), <EM>F</EM> ("fucked", valeur chang&eacute;e),
+<EM>E</EM> (&eacute;gal). Ces param&egrave;tres correspondent aux options suivantes
+(m&ecirc;me ordre)&nbsp;<EM>ip-id</EM>, <EM>ip-csum</EM>, <EM>udp-csum</EM>,
+<EM>udp-data</EM> qui peuvent prendre une des valeurs suivantes&nbsp;: 
+
+
+
+
+
+
+
+<EM>zero</EM>, <EM>mangle</EM>, <EM>same</EM>.</LI>
+<LI><EM>RIPLEN, ULEN</EM>
+&nbsp;: Ces param&egrave;tres d&eacute;crivent les longeurs initiales des paquets IP
+et UDP, correspondant aux options <EM>ip-len</EM> et
+<EM>udp-len</EM>. Elles peuvent &ecirc;tre d&eacute;finies &agrave; une valeur quelconque
+ou &agrave; <EM>same</EM> pour conserver les valeurs originales.
+
+
+</LI>
+</UL>
+<P>Ici, on pourrait donc utiliser ce qui suit&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  udp_unreach {
+    reply yes;
+    df no;
+    max-len 56;
+    tos 0;
+    
+    mangle-original {
+      ip-len 348;
+      ip-id same;
+      ip-csum zero;
+      udp-len 308;
+      udp-csum zero;
+      udp-data same;
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Il n'y a plus qu'&agrave; tester ! Un tel fichier peut par la suite &ecirc;tre
+am&eacute;lior&eacute; et optimis&eacute; afin d'&ecirc;tre &agrave; la fois plus fiable (le
+r&eacute;ordonnancement d'option et le g&eacute;n&eacute;rateur de num&eacute;ros de s&eacute;quence
+initiaux ne sont pas simples &agrave; "deviner") et plus performant
+(regrouper les tests, etc.).
+<P>
+<P>
+<P>
+<P>
+<H2><A NAME="ss5.2">5.2 R&eacute;seau de test</A>
+</H2>
+
+<P>
+<P>Afin de d&eacute;montrer quelques unes des capacit&eacute;s du module IP Personality,
+pla&ccedil;ons nous dans le cadre de deux r&eacute;seaux r&eacute;duits &agrave; une machine,
+reli&eacute;s via une machine routeur o&ugrave; tourne le module. La configuration
+esr la suivante&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
++---------+           +---------+           +---------+               
+| suskind |&lt;--------->|   dse2  |&lt;--------->|   dse1  |
++---------+           +---------+           +---------+               
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Les syst&egrave;mes d'exploitation utilis&eacute;s pour les tests sont sur chacune
+des machines&nbsp;:
+<P>
+<P>
+<UL>
+<LI>suskind&nbsp;: FreeBSD-2.2.8-RELEASE.</LI>
+<LI>dse1&nbsp;: Linux 2.2.14.</LI>
+<LI>dse2&nbsp;: Linux 2.3.99pre6 (ippersonality).</LI>
+</UL>
+<P>On peut tout de suite v&eacute;rifier que ces OS sont mutuellement
+d&eacute;tectables &agrave; l'aide de nmap par exemple, &agrave; partir de chacune des
+machines. (on a laiss&eacute; les d&eacute;tails afin de voir en quoi ils changent
+par la suite).
+<P>
+<P>
+<P>
+<P>Si l'on effectue un nmap de suskind vers dse2&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=2119945 (Good luck!)
+  
+  Sequence numbers: 59CEAA9C 5987D082 59CC67D4 59598903 5983CC3D 5971B98C
+  Remote OS guesses: Linux 2.3.49 x86, Linux 2.3.99-pre2 x86
+  OS Fingerprint:
+  TSeq(Class=RI%gcd=1%SI=205909)
+  T1(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T4(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+  PU(Resp=Y%DF=Y%TOS=C0%IPLEN=164%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>On observe le m&ecirc;me r&eacute;sultat avec un nmap de dse1 vers dse2.
+<P>
+<P>Si l'on effectue un nmap de dse1 vers suskind&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=9819 (Worthy challenge)
+  
+  Sequence numbers: 3B1E1359 3B1F0409 3B1F9BAB 3B201E56 3B20B8D2 3B217357
+  Remote operating system guess: FreeBSD 2.2.1 - 3.2
+  OS Fingerprint:
+  TSeq(Class=RI%gcd=1%SI=265B)
+  T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+  T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>On se donne maintenant 3 fichiers d'&eacute;mulation de syst&egrave;mes
+d'exploitation, soit <EM>amigaos.conf</EM>, <EM>linux.conf</EM>,
+et <EM>win9x.conf</EM>.
+<P>
+<P>
+<P>
+<P>On d&eacute;cide de faire passer dse2 pour une machine windows aupr&egrave;s
+de suskind. Il suffit d'utiliser les deux ligne suivantes (sur
+dse2)&nbsp;:
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s suskind -d dse2 -j PERS --tweak dst \
+    --local --conf win9x.conf
+  iptables -t mangle -A OUTPUT -s dse2 -d suskind -j PERS --tweak src \
+    --local --conf win9x.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>On d&eacute;cide ensuite de faire passer dse2 pour une machine amiga
+aupr&egrave;s de dse1. Il suffit de rajouter les deux lignes
+suivantes&nbsp;:
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s dse1 -d dse2 -j PERS --tweak dst \
+    --local --conf amigaos.conf
+  iptables -t mangle -A OUTPUT -s dse2 -d dse1 -j PERS --tweak src \
+    --local --conf amigaos.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Pour utiliser le r&ocirc;le de routeur de la machine on veut &eacute;galement
+modifier la mani&egrave;re dont dse1 voit suskind, en faisant
+passer suskind pour une machine sous Linux.
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s suskind -d dse1 -j PERS --tweak src \
+    --conf linux.conf
+  iptables -t mangle -A PREROUTING -s dse1 -d suskind -j PERS --tweak dst \
+    --conf linux.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Voyons maintenant ce que donnent les m&ecirc;me tests que pr&eacute;c&eacute;demment
+(avec nmap).
+<P>
+<P>Si l'on effectue un nmap de suskind vers dse2&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=trivial time dependency
+                           Difficulty=0 (Trivial joke)
+  
+  Sequence numbers: A97ECB1D A97ECB1F A97ECB21 A97ECB23 A97ECB25 A97ECB27
+  Remote operating system guess: Windows NT4 / Win95 / Win98
+  OS Fingerprint:
+  TSeq(Class=TD%gcd=2%SI=0)
+  T1(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  T3(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+  T4(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  PU(Resp=N)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Si l'on effectue un nmap de dse1 vers dse2&nbsp;:
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=64K rule
+                           Difficulty=1 (Trivial joke)
+  
+  Sequence numbers: D997B378 D998AD78 D999A778 D99AA178 D99B9B78 D99C9578
+  Remote operating system guess: AmigaOS AmiTCP/IP 4.3
+  OS Fingerprint:
+  TSeq(Class=64K)
+  T1(Resp=Y%DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=N)
+  T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+  T4(Resp=Y%DF=N%W=2000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>Si l'on effectue un nmap de dse1 vers suskind&nbsp;:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=188907 (Good luck!)
+  
+  Sequence numbers: 32BD32 393D33 3B87EE 3FE6A3 4AC5E7 4F9533
+  No OS matches for host (If you know what OS is running on it,
+  see http://www.insecure.org/cgi-bin/nmap-submit.cgi).
+  TCP/IP fingerprint:
+  TSeq(Class=RI%gcd=1%SI=2EF4C)
+  TSeq(Class=RI%gcd=1%SI=2EF18)
+  TSeq(Class=RI%gcd=1%SI=2E1EB)
+  T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>On constate bien que dans le cas de la machine locale dse2 on
+peut compl&egrave;tement tromper nmap. En revanche en mode "routeur",
+les param&egrave;tres sur lesquels on joue le perturbent, mais ne suffisent
+pas &agrave; lui faire d&eacute;tecter un autre syst&egrave;me.
+<P>
+<P>
+<P>
+<P>
+<P>
+<HR>
+<A HREF="ippersonality-fr-6.html">Page suivante</A>
+<A HREF="ippersonality-fr-4.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc5">Table des matières</A>
+</BODY>
+</HTML>

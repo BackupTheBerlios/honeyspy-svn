@@ -1,0 +1,300 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Pseudo Code</TITLE>
+ <LINK HREF="ippersonality-fr-7.html" REL=next>
+ <LINK HREF="ippersonality-fr-5.html" REL=previous>
+ <LINK HREF="ippersonality-fr.html#toc6" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-7.html">Page suivante</A>
+<A HREF="ippersonality-fr-5.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc6">Table des matières</A>
+<HR>
+<H2><A NAME="s6">6. Pseudo Code</A></H2>
+
+<H2><A NAME="ss6.1">6.1 G&eacute;n&eacute;ralit&eacute;s</A>
+</H2>
+
+<P>
+<P>Nous avons impl&eacute;ment&eacute; une machine virtuelle simple au sein du
+noyau. Celle-ci op&egrave;re sur un paquet TCP en entr&eacute;e et g&egrave;re un &eacute;tat
+interne. Son &eacute;tat est compos&eacute; de&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI>Un pointeur d'instruction dans le code.
+</LI>
+<LI>Un buffer de stockage d'options TCP.
+</LI>
+<LI>Plusieurs "registres"&nbsp;:
+
+<EM>flags</EM>, <EM>mss</EM>, <EM>wscale</EM>, <EM>win</EM>,
+<EM>ack</EM> et <EM>df</EM>
+correspondants aux champs TCP du m&ecirc;me nom pour un &eacute;ventuel paquet
+de r&eacute;ponse.
+
+</LI>
+</UL>
+<P>Le code execut&eacute; par la machine virtuelle est compos&eacute; d'instructions sur
+32 bits (en ordre de la machine) regroupant un mn&eacute;monique (sur 8 bits),
+une option (sur 4 bits) et un op&eacute;rande (sur 20 bits), comme visible
+ci apr&egrave;s.
+<P>
+<P>
+<P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+0              7 8     11 12                                    31
++---------------+--------+---------------------------------------+
+|    Mnemonic   | Option |              Operand                  |
++---------------+--------+---------------------------------------+
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H2><A NAME="ss6.2">6.2 Instructions</A>
+</H2>
+
+<P>
+<P>
+<H3>TEST</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 01
+<P>Effectue un test sur l'objet d&eacute;fini par l'option. Si le test est vrai,
+le pointeur d'instruction passe de l'instruction <EM>i</EM> &agrave; l'instruction
+<EM>i+2</EM>. Si le test est faux, l'ex&eacute;cution se continue &agrave; l'instruction
+<EM>i+1</EM>.
+<P>
+<P>
+<P>
+<P>
+<P>Les options des tests sont les suivantes&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>TCP Option</EM> (0)
+&nbsp;: Vrai si l'option TCP dont le
+code est pass&eacute; en op&eacute;rande est d&eacute;fini dans le paquet initial.
+
+
+</LI>
+<LI><EM>Any TCP Flags</EM> (1)
+&nbsp;: Vrai si un des flags TCP
+pass&eacute;s en op&eacute;rande est activ&eacute; dans les flags TCP du paquet initial.
+
+
+</LI>
+<LI><EM>All TCP Flags</EM> (2)
+&nbsp;: Vrai si tous les flags TCP
+pass&eacute;s en op&eacute;rande sont activ&eacute;s dans les flags TCP du paquet initial.
+
+
+</LI>
+<LI><EM>Ack</EM> (3)
+&nbsp;: Vrai si la valeur de l'acquittement
+du paquet initial vaut l'op&eacute;rande.
+
+</LI>
+<LI><EM>Listen</EM> (4)
+&nbsp;: Vrai si le port destination du
+paquet initial est ouvert sur la machine locale.
+
+</LI>
+</UL>
+<P>
+<H3>JMP</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 02
+<P>Continue l'ex&eacute;cution &agrave; l'instruction dont le num&eacute;ro est
+l'op&eacute;rande.
+<P>
+<P>
+<H3>PUT</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 03
+<P>Ins&egrave;re une option TCP dans le buffer d'options TCP. L'option TCP ins&eacute;r&eacute;e est
+l'op&eacute;rande, sa source est d&eacute;termin&eacute;e par l'option de
+l'instruction.
+<P>
+<P>
+<P>
+<P>Les options sont les suivantes&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>Copy</EM> (0)
+&nbsp;: L'option ins&eacute;r&eacute;e est copi&eacute;e &agrave; partir du
+paquet initial si elle y est d&eacute;finie.
+
+</LI>
+<LI><EM>Insert</EM> (1)
+&nbsp;: L'option ins&eacute;r&eacute;e est copi&eacute;e &agrave; partir
+des registres de la machine virtuelle. Uniquement valable pour les
+options <EM>mss</EM>, <EM>wscale</EM> and <EM>timestamp</EM>.
+
+
+
+</LI>
+</UL>
+<P>
+<H3>SET</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 04
+<P>D&eacute;finit la valeur d'un registre de la machine virtuelle. Le registre
+concern&eacute; et le type d'affectation sont d&eacute;termin&eacute;s par l'option. La
+valeur utilis&eacute;e est l'op&eacute;rande.
+<P>
+<P>
+<P>
+<P>Les options accept&eacute;es sont les suivantes&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>flags</EM> (0)
+&nbsp;: D&eacute;finit le registre <EM>flags</EM> &agrave; la
+valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>ack</EM> (1)
+&nbsp;: D&eacute;finit le registre <EM>ack</EM>
+(acquittement) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>df</EM> (2)
+&nbsp;: D&eacute;finit le registre <EM>df</EM> (bit "Don't
+Fragment" de l'ent&ecirc;te IP) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>win</EM> (3)
+&nbsp;: D&eacute;finit le registre <EM>win</EM> (taille de
+fen&ecirc;tre) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>mss</EM> (4)
+&nbsp;: D&eacute;finit le registre <EM>mss</EM> (taille de
+segment TCP maximale) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>wscale</EM> (5)
+&nbsp;: D&eacute;finit le registre <EM>wscale</EM> (mise
+&agrave; l'&eacute;chelle de la fen&ecirc;tre) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>timestamp</EM> (6)
+&nbsp;: D&eacute;finit le registre <EM>timestamp</EM> (valeur locale du
+timestamp) &agrave; la valeur de l'op&eacute;rande.
+
+</LI>
+<LI><EM>relative ack</EM> (9)
+&nbsp;: D&eacute;finit le registre <EM>ack</EM>
+(acquittement) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e au num&eacute;ro de s&eacute;quence
+du paquet initial.
+
+
+</LI>
+<LI><EM>relative df</EM> (10)
+&nbsp;: D&eacute;finit le registre <EM>df</EM> (bit "Don't
+Fragment" de l'ent&ecirc;te IP) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e &agrave; celle
+de la valeur de ce champ dans le paquet initial.
+
+
+</LI>
+<LI><EM>relative win</EM> (11)
+&nbsp;: D&eacute;finit le registre <EM>win</EM> (taille de
+fen&ecirc;tre) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e &agrave; la taille de fen&ecirc;tre du
+paquet initial.
+
+
+</LI>
+<LI><EM>relative mss</EM> (12)
+&nbsp;: D&eacute;finit le registre <EM>mss</EM> (taille de
+segment TCP maximale) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e &agrave; la valeur
+mss du paquet initial (si d&eacute;finie).
+
+
+</LI>
+<LI><EM>relative wscale</EM> (13)
+&nbsp;: D&eacute;finit le registre wscale (mise
+&agrave; l'&eacute;chelle de la fen&ecirc;tre) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e &agrave; la
+valeur wscale du paquet initial (si d&eacute;finie).
+
+
+</LI>
+<LI><EM>relative timestamp</EM> (14)
+&nbsp;: D&eacute;finit le registre <EM>timestamp</EM> (valeur locale du
+timestamp) &agrave; la valeur de l'op&eacute;rande ajout&eacute;e &agrave; la valeur courante
+utilisable pour le timestamp.
+
+
+</LI>
+</UL>
+<P>
+<H3>RET</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 05
+<P>Termine l'ex&eacute;cution du programme en retournant l'op&eacute;rande.
+<P>
+<P>Les op&eacute;randes accept&eacute;s sont les suivants&nbsp;:
+<P>
+<P>
+<UL>
+<LI><EM>Accept</EM> (1)
+&nbsp;: Termine l'ex&eacute;cution et demande
+l'acceptation du paquet pour continuer son traitement.
+
+</LI>
+<LI><EM>Drop</EM> (2)
+&nbsp;: Termine l'ex&eacute;cution et demande
+l'abandon du paquet.
+
+</LI>
+<LI><EM>Reply</EM> (3)
+&nbsp;: Termine l'ex&eacute;cution et demande
+l'envoi d'une r&eacute;ponse bas&eacute;e sur l'&eacute;tat de la machine virtuelle.
+
+
+</LI>
+</UL>
+<P>
+<H2><A NAME="ss6.3">6.3 Options TCP</A>
+</H2>
+
+<P>
+<P>Pour les diff&eacute;rentes instructions acceptant des options TCP, les
+options suivantes sont reconnues&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI><EM>eol</EM> (0)</LI>
+<LI><EM>nop</EM> (1)</LI>
+<LI><EM>mss</EM> (2)</LI>
+<LI><EM>wscale</EM> (3)</LI>
+<LI><EM>sackOK</EM> (4)</LI>
+<LI><EM>sack</EM> (5)</LI>
+<LI><EM>echo</EM> (6)</LI>
+<LI><EM>echoreply</EM> (7)</LI>
+<LI><EM>timestamp</EM> (8)</LI>
+<LI><EM>pocOK</EM> (9)</LI>
+<LI><EM>pocSP</EM> (10)</LI>
+<LI><EM>CC</EM> (11)</LI>
+<LI><EM>CC.NEW</EM> (12)</LI>
+<LI><EM>CC.ECHO</EM> (13)</LI>
+<LI><EM>acreq</EM> (14)</LI>
+<LI><EM>acdata</EM> (15)</LI>
+</UL>
+<P>
+<HR>
+<A HREF="ippersonality-fr-7.html">Page suivante</A>
+<A HREF="ippersonality-fr-5.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc6">Table des matières</A>
+</BODY>
+</HTML>

@@ -1,0 +1,576 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Example</TITLE>
+ <LINK HREF="ippersonality-en-6.html" REL=next>
+ <LINK HREF="ippersonality-en-4.html" REL=previous>
+ <LINK HREF="ippersonality-en.html#toc5" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-en-6.html">Next</A>
+<A HREF="ippersonality-en-4.html">Previous</A>
+<A HREF="ippersonality-en.html#toc5">Contents</A>
+<HR>
+<H2><A NAME="s5">5. Example</A></H2>
+
+<P>
+<P>
+<H2><A NAME="ss5.1">5.1 Configuration file</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>Suppose we want to create a configuration file to emulate an AmigaOS
+system. For this purpose we have the following nmap signature (refer
+to nmap documentation for more details):
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  Fingerprint AmigaOS AmiTCP/IP 4.3
+  TSeq(Class=64K)
+  T1(DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=N)
+  T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+  T4(DF=N%W=2000%ACK=O%Flags=R%Ops=)
+  T5(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>First we have to start the configuration file with an
+identification as follows:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  id "AmigaOS";
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>For a start, we want to rewrite only incoming TCP connections and
+not changing TCP windows sizes (only fool nmap), hence we use a simple
+<EM>tcp</EM> section.
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp {
+    incoming yes;
+    outgoing no;
+    max-window 32768;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>The <EM>TSeq</EM> line in nmap signature defines the ISN generator
+to use. The important parameter is the <EM>class</EM> one. The various
+possible classes are:
+<UL>
+<LI><EM>Class=C</EM>
+
+
+: Constant generator, modeled by <EM>fixed-inc 0</EM>.</LI>
+<LI><EM>Class=TD</EM>
+
+
+
+
+: Time dependant generator. It can be emulated with a fixed-inc
+generator, with a small increment in order to satisfy the <EM>gcd</EM> and <EM>si</EM>
+fields. There are no rules to do that precisely, so you have to try several values.</LI>
+<LI><EM>Class=RI</EM>
+
+
+
+
+: Random Increments Generator. It can be emulated with the random-inc type. The
+interval of generation of ISN is determined by nmap's "difficulty" (<EM>gcd</EM>
+and <EM>SI</EM>). Here too it is better to try several values.</LI>
+<LI><EM>Class=TR</EM>
+
+: True Random Generator, can be emulated by <EM>true-random</EM></LI>
+<LI><EM>Class=i800</EM>, <EM>Class=64K</EM>
+
+
+: Fixed incrementation of multiples of 800 and 64000 respectively.</LI>
+</UL>
+<P>
+<P>Hence here we will use:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_isn {
+    type fixed-inc 64000;
+    initial-value random;
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>Then follow the various TCP tests results on <EM>Tx</EM>
+lines. Their syntax is always the same and describes a possible answer
+received by nmap for that test.
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  Tx(Resp=Y%DF=Y%W=XXXX%ACK=S++%Flags=AS%Ops=M)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>The meaning of the various fields are:
+<P>
+<UL>
+<LI><EM>Resp</EM>
+
+: <EM>Y</EM> if an answer was received, <EM>N</EM> otherwise.</LI>
+<LI><EM>DF</EM>
+
+: Specify whether the "Don't Fragment" bit is enabled in the anwser</LI>
+<LI><EM>W</EM>
+
+
+: Specify the window size or sizes (separated by "|")
+expected in the answer.</LI>
+<LI><EM>ACK</EM>
+
+
+
+
+: Specify the expected acquittement value for the answer. Can be
+set to a numeric value, or <EM>S</EM> to mean the test initial
+sequence number, or <EM>S++</EM> for the test initial sequence number
+plus one.</LI>
+<LI><EM>Flags</EM>
+
+
+
+: Contains the TCP flags that must be enabled in the answer, coded
+as their initials. (<EM>A</EM> for <EM>Ack</EM>, <EM>S</EM> for
+<EM>Syn</EM>, ...).</LI>
+<LI><EM>Ops</EM>
+
+
+
+
+
+: Contains the list of options following their order in the anwser, as
+their respective initials. (<EM>M</EM> for <EM>MSS</EM>, <EM>N</EM>
+for <EM>NOP</EM>, ...) except for <EM>E</EM> which means the previous
+option has the same value as in the test packet.</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>If we want to emulate the system accurately, we need to guess the
+options reordering scheme from the various tests results and their
+matching tests packets. Here, only one option is supported, so the
+corresponding section is quite simple:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_options {
+    keep-unknown yes;
+    keep-unused no;
+    isolated-packets yes;
+    code {
+      copy(mss);
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Now the system starts looking like the emulated one. However our
+answers will not fool nmap for really precise tests. In order to
+completely fool it locally, we can extract appropriate answers to
+return in <EM>decoy</EM> mode from its TCP test results. For that we
+can use a code "squeleton" that fits its tests and fill it to get
+the expected answers:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  tcp_decoy {
+    code {
+      if (option(mss)) {
+        if (listen) {
+          if (flags(syn&amp;ece)) {
+            /* nmap test 1 */
+          }
+          if (flags(null)) {
+            /* nmap test 2 */
+          } 
+          if (flags(syn&amp;fin&amp;urg&amp;push)) {
+            /* nmap test 3 */
+          }
+          if (ack(0) &amp;&amp; flags(ack) &amp;&amp; !flags(syn|push|urg|rst)) {
+            /* nmap test 4 *
+          }
+        } else {
+          if (flags(syn) &amp;&amp; !flags(ack)) {
+            /* nmap test 5 */
+          }
+          if (ack(0) &amp;&amp; flags(ack) &amp;&amp; !flags(syn|push|urg|rst)) {
+            /* nmap test 6 *
+          }
+          if (flags(fin&amp;push&amp;urg)) {
+            /* nmap test 7 */
+          }
+        }
+      }
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>And then we only need to write the code for each test, for
+instance for the first one:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  set(df, 0);
+  set(win, 0x1F0E);
+  set(ack, this + 1);
+  set(flags, ack|syn);
+  insert(mss, this+1);
+  reply;
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>or for the second one (no answer):
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  drop;
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>Finaly, we can also locally react (in the <EM>udp_decoy</EM>
+section) to the last nmap test, an UDP port-unreach probe
+(<EM>PU</EM>), which has the following syntax:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>The meaning of the various fields are:
+<UL>
+<LI><EM>Resp</EM>
+
+
+
+
+
+: Like previously, equivalent to the <EM>df</EM> option.</LI>
+<LI><EM>TOS</EM>
+
+: Type Of Service, equivalent to the <EM>tos</EM> option.</LI>
+<LI><EM>IPLEN</EM>
+
+
+: length of the ICMP packet. Can be set by using the <EM>max-len</EM>
+option.</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>The generated ICMP unreach includes the beginning of the original packet
+(as recommended by the RFC). Nmap tries to see if it was changed, so
+the following fields apply to the <EM>mangle-original</EM> subsection.
+<UL>
+<LI><EM>RID, RIPCK, UCK, DAT</EM>
+
+
+
+
+
+
+
+
+: These fields describe the change of respectively
+the original IP ID, the original IP checksum, the original UDP checksum,
+the original data block. They can have one of 3 values: 0 (zeroed), F
+(fucked), E (equal). Those fields are "mapped" to the following
+ippersonality parameters (same order) : <EM>ip-id</EM>, <EM>ip-csum</EM>, <EM>udp-csum</EM>,
+<EM>udp-data</EM> which can have one of the three following values
+(same order too): 
+<EM>zero</EM>, <EM>mangle</EM>, <EM>same</EM>.</LI>
+<LI><EM>RIPLEN, ULEN</EM>
+
+
+
+
+: Those fields describe the original IP and UDP length and are
+equivalent to the <EM>ip-len</EM> and <EM>udp-len</EM> options. They can be set to
+a numeric value or to <EM>same</EM> if they are to be kept as is.</LI>
+</UL>
+<P>
+<P>So here, the following could be used:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  udp_unreach {
+    reply yes;
+    df no;
+    max-len 56;
+    tos 0;
+    
+    mangle-original {
+      ip-len 348;
+      ip-id same;
+      ip-csum zero;
+      udp-len 308;
+      udp-csum zero;
+      udp-data same;
+    }
+  }
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>Time to test! Such a file can later on be improved and optimized
+in order to be more reliable (options reordering and the ISN generator
+are a little tricky to "guess") and faster (group several tests, etc.).
+<P>
+<H2><A NAME="ss5.2">5.2 Test network</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>In order to check the capabilities of the IP Personality module,
+let's take two different networks (with only one host in each), linked
+together by a router running IP Personality. This gives us
+something like:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
++---------+           +---------+           +---------+               
+| suskind |&lt;--------->|   dse2  |&lt;--------->|   dse1  |
++---------+           +---------+           +---------+               
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>The operating systems used on each host are:
+<P>
+<UL>
+<LI>suskind&nbsp;: FreeBSD-2.2.8-RELEASE.</LI>
+<LI>dse1&nbsp;: Linux 2.2.14.</LI>
+<LI>dse2&nbsp;: Linux 2.3.99pre6 (ippersonality).</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>We can first check that each OS can be remotely detected by nmap
+from any host in our test-bed (details were kept so we could see how
+they changed after):
+<P>
+<P>If we run nmap against dse2 from suskind:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=2119945 (Good luck!)
+  
+  Sequence numbers: 59CEAA9C 5987D082 59CC67D4 59598903 5983CC3D 5971B98C
+  Remote OS guesses: Linux 2.3.49 x86, Linux 2.3.99-pre2 x86
+  OS Fingerprint:
+  TSeq(Class=RI%gcd=1%SI=205909)
+  T1(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T4(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+  PU(Resp=Y%DF=Y%TOS=C0%IPLEN=164%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>We obtain the same result when nmapping dse2 from dse1.
+<P>
+<P>If we run nmap against suskind from dse1:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=9819 (Worthy challenge)
+  
+  Sequence numbers: 3B1E1359 3B1F0409 3B1F9BAB 3B201E56 3B20B8D2 3B217357
+  Remote operating system guess: FreeBSD 2.2.1 - 3.2
+  OS Fingerprint:
+  TSeq(Class=RI%gcd=1%SI=265B)
+  T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+  T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>Now let's take 3 configuration files for 3 different operating
+systems : <EM>amigaos.conf</EM>, <EM>linux.conf</EM>,
+and <EM>win9x.conf</EM>.
+<P>
+<P>
+<P>
+<P>We want to have dse2 look like a windows box from suskind. To do
+that, we simply enter the two following lines (on dse2):
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s suskind -d dse2 -j PERS --tweak dst \
+    --local --conf win9x.conf
+  iptables -t mangle -A OUTPUT -s dse2 -d suskind -j PERS --tweak src \
+    --local --conf win9x.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>Then, we decide to have dse2 look like an amiga from dse1. The
+following two lines are used:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s dse1 -d dse2 -j PERS --tweak dst \
+    --local --conf amigaos.conf
+  iptables -t mangle -A OUTPUT -s dse2 -d dse1 -j PERS --tweak src \
+    --local --conf amigaos.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>In order to try the routing capabilities as well, we want to have
+suskind look a linux box from dse1.
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  iptables -t mangle -A PREROUTING -s suskind -d dse1 -j PERS --tweak src \
+    --conf linux.conf
+  iptables -t mangle -A PREROUTING -s dse1 -d suskind -j PERS --tweak dst \
+    --conf linux.conf
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>Let's redo the previous nmap tests:
+<P>
+<P>If we run nmap against dse2 from suskind:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=trivial time dependency
+                           Difficulty=0 (Trivial joke)
+  
+  Sequence numbers: A97ECB1D A97ECB1F A97ECB21 A97ECB23 A97ECB25 A97ECB27
+  Remote operating system guess: Windows NT4 / Win95 / Win98
+  OS Fingerprint:
+  TSeq(Class=TD%gcd=2%SI=0)
+  T1(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  T3(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+  T4(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  PU(Resp=N)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>If we run nmap against dse2 from dse1:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=64K rule
+                           Difficulty=1 (Trivial joke)
+  
+  Sequence numbers: D997B378 D998AD78 D999A778 D99AA178 D99B9B78 D99C9578
+  Remote operating system guess: AmigaOS AmiTCP/IP 4.3
+  OS Fingerprint:
+  TSeq(Class=64K)
+  T1(Resp=Y%DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+  T2(Resp=N)
+  T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+  T4(Resp=Y%DF=N%W=2000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>If we run nmap against suskind from dse1:
+<BLOCKQUOTE><CODE>
+<PRE>
+  TCP Sequence Prediction: Class=random positive increments
+                           Difficulty=188907 (Good luck!)
+  
+  Sequence numbers: 32BD32 393D33 3B87EE 3FE6A3 4AC5E7 4F9533
+  No OS matches for host (If you know what OS is running on it,
+  see http://www.insecure.org/cgi-bin/nmap-submit.cgi).
+  TCP/IP fingerprint:
+  TSeq(Class=RI%gcd=1%SI=2EF4C)
+  TSeq(Class=RI%gcd=1%SI=2EF18)
+  TSeq(Class=RI%gcd=1%SI=2E1EB)
+  T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T2(Resp=N)
+  T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+  T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+  T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+  T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+  T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+  PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<P>
+<P>
+<P>
+<P>We can notice how dse2 completely fools nmap locally. However,
+when trying to hide routed hosts, the changed parameters make it
+unable to recognize the real operating system but are not sufficient
+to completely fool it.
+<P>
+<HR>
+<A HREF="ippersonality-en-6.html">Next</A>
+<A HREF="ippersonality-en-4.html">Previous</A>
+<A HREF="ippersonality-en.html#toc5">Contents</A>
+</BODY>
+</HTML>

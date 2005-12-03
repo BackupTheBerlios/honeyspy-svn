@@ -1,0 +1,98 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Probl&egrave;mes</TITLE>
+ <LINK HREF="ippersonality-fr-3.html" REL=next>
+ <LINK HREF="ippersonality-fr-1.html" REL=previous>
+ <LINK HREF="ippersonality-fr.html#toc2" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-fr-3.html">Page suivante</A>
+<A HREF="ippersonality-fr-1.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc2">Table des matières</A>
+<HR>
+<H2><A NAME="s2">2. Probl&egrave;mes</A></H2>
+
+<P>
+<P>L'examen des tests effectu&eacute;s par nmap montre qu'ils s'appuient
+sur des paquets sinon anormaux, du moins &eacute;tranges. Ceux-ci
+sont donc facilement d&eacute;tectables et peuvent d&eacute;clencher des actions
+appropri&eacute;es.
+<P>Ainsi on peut ais&eacute;ment envisager de modifier les r&eacute;ponses d'une
+machine locale lorsque l'on re&ccedil;oit de tels paquets. Mais ces
+modifications ne sont pas sans cons&eacute;quences&nbsp;:
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<P>
+<UL>
+<LI>certaines caract&eacute;ristiques d'OS sont d&ucirc;es &agrave; l'architecture sur
+laquelle ils fonctionnent, par exemple les tailles de page m&eacute;moire sur
+diff&eacute;rents processeurs, ce qui peut &eacute;ventuellement poser des probl&egrave;mes
+de performances&nbsp;;
+
+
+</LI>
+<LI>certaines des modifications reposent sur des choix "politiques" lors
+de l'impl&eacute;mentation de la pile IP (choix des num&eacute;ros de s&eacute;quence,
+taille des fen&ecirc;tres, options IP support&eacute;es). Les modifier permet de
+tromper le d&eacute;tecteur mais peut poser probl&egrave;me lors de communication
+l&eacute;gitimes, en d&eacute;t&eacute;riorant les capacit&eacute;s de la pile IP ou en
+affaiblissant sa s&eacute;curit&eacute;, par exemple si la qualit&eacute; g&eacute;n&eacute;rale de la
+pile IP du syst&egrave;me &eacute;mul&eacute; (conformit&eacute; avec la RFC, robustesse) est
+inf&eacute;rieure &agrave; celle de la machine l'&eacute;mulant.
+
+
+
+
+
+</LI>
+</UL>
+<P>Malgr&eacute; tout, ces modifications sont r&eacute;alisables dans la plupart
+des cas pour la machine locale. En revanche, il n'en est pas de m&ecirc;me
+pour les machines rout&eacute;es, en effet&nbsp;:
+<P>
+<P>
+<P>
+<UL>
+<LI>tous les tests ne peuvent &ecirc;tre g&eacute;r&eacute;s par la machine locale,
+celle-ci ne connaissant pas l'&eacute;tat pr&eacute;cis de la pile IP des machines
+rout&eacute;es, n&eacute;cessaire pour g&eacute;n&eacute;rer les r&eacute;ponses ad&eacute;quates&nbsp;;
+
+
+</LI>
+<LI>les d&eacute;cisions prises par les machines rout&eacute;es ne peuvent &ecirc;tre que
+partiellement modifi&eacute;es par la machine locale et ce de mani&egrave;re
+permanente, la machine locale n'ayant pas de moyen de communiquer ses
+modifications aux machines rout&eacute;es&nbsp;;
+
+
+</LI>
+<LI>toute information perdue par les machines rout&eacute;es ne pourra &ecirc;tre
+restitu&eacute;e par la machine locale (&agrave; moins de conserver tout le traffic,
+ce qui n'est pas r&eacute;alisable)&nbsp;;
+
+
+</LI>
+<LI>la machine locale ne doit pas inventer des informations. Par
+exemple, si l'on prend le cadre d'un test auquel les machines ne
+donnent aucune r&eacute;ponse, l'envoi d'une r&eacute;ponse par la machine locale en
+lieu et place de la machine rout&eacute;e permettrait &eacute;ventuellemnt de
+r&eacute;pondre pour une machine inexistante.
+
+
+
+</LI>
+</UL>
+<P>
+<HR>
+<A HREF="ippersonality-fr-3.html">Page suivante</A>
+<A HREF="ippersonality-fr-1.html">Page précédente</A>
+<A HREF="ippersonality-fr.html#toc2">Table des matières</A>
+</BODY>
+</HTML>

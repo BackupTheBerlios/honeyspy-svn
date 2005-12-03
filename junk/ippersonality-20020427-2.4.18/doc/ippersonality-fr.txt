@@ -1,0 +1,2640 @@
+  IP Personality
+  Gaël Roualland - Jean-Marc Saffroy
+  $Id: ippersonality.sgml,v 1.27 2001/07/23 22:19:36 g_roual­
+  land Exp $
+
+  Documentation IP Personality (List : ippersonality-devel@lists.source­
+  forge.net)
+  ______________________________________________________________________
+
+  Table des matières
+
+
+  1. Introduction
+
+  2. Problèmes
+
+  3. IP Personality
+
+     3.1 Fonctionnalités
+     3.2 Trajet d'un paquet dans PERS
+        3.2.1 Cas d'un paquet TCP
+        3.2.2 Cas d'un paquet UDP
+        3.2.3 Partie commune des packets IP
+
+  4. Configuration
+
+     4.1 Options en ligne de commande
+     4.2 Fichier de configuration
+        4.2.1 Identification
+        4.2.2 Paramètres génériques TCP
+        4.2.3 Paramètres de générateur de numéros de séquence
+        4.2.4 Paramètres de générateur d'Identifiants IP
+        4.2.5 Paramètres de rééordonnancement des options
+        4.2.6 Paramètres du leurre TCP
+        4.2.7 Paramètres du leurre UDP
+     4.3 Langage
+
+  5. Exemple
+
+     5.1 Fichier de configuration
+     5.2 Réseau de test
+
+  6. Pseudo Code
+
+     6.1 Généralités
+     6.2 Instructions
+        6.2.1 TEST
+        6.2.2 JMP
+        6.2.3 PUT
+        6.2.4 SET
+        6.2.5 RET
+     6.3 Options TCP
+
+  7. Outils de développement
+
+     7.1 Debogage
+     7.2 Osdet
+     7.3 Perscc
+
+  8. Bibliographie
+
+
+
+  ______________________________________________________________________
+
+
+  11..  IInnttrroodduuccttiioonn
+
+
+  En dehors des comportements specifiés par les  RFC, chaque pile TCP/IP
+  possède ses propres spécificités (choix d'implémentation, bugs,
+  améliorations, ...) en particulier concernant la manière de réagir
+  face aux paquets anormaux, c'est à dire ne respectant pas les RFC.
+
+  Ces spécificités sont exploitées par des logiciels afin de deviner, à
+  distance via le réseau, quel système d'exploitation tourne sur une
+  machine donnée. Ils fonctionnent en émettant des paquets anormaux (en
+  jouant notamment sur la fragmentation, les flags TCP, les champs
+  inutilisés, la taille des paquets, ...) à destination des machines
+  cibles, et analysent les réponses en les comparant à une base de
+  comportements connus des différents systèmes d'exploitation.
+
+  Ces logiciels sont utilisés par les administrateurs réseau pour
+  recenser leurs parcs hétérogènes de machines, mais aussi par les
+  pirates qui cherchent à apprendre le maximum d'informations sur une
+  machine ou un réseau de machines pour adapter leurs attaques et
+  maximiser leurs chances de réussite.
+
+  _I_P _P_e_r_s_o_n_a_l_i_t_y est un module pour _n_e_t_f_i_l_t_e_r dont l'objectif est de
+  pouvoir émuler différentes "personalités" réseau, en changeant les
+  caractéristiques du traffic réseau, selon différents paramètres. En
+  particulier cela permet de tromper de tels outils en faisant passer un
+  système pour un autre, afin par exemple de masquer ou de protéger des
+  systèmes autrement vulnérables, ou encore pour mettre en place des
+  "pots de miel" (honey pots).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  22..  PPrroobbllèèmmeess
+
+
+  L'examen des tests effectués par nmap montre qu'ils s'appuient sur des
+  paquets sinon anormaux, du moins étranges. Ceux-ci sont donc
+  facilement détectables et peuvent déclencher des actions appropriées.
+
+  Ainsi on peut aisément envisager de modifier les réponses d'une
+  machine locale lorsque l'on reçoit de tels paquets. Mais ces
+  modifications ne sont pas sans conséquences :
+  ·  certaines caractéristiques d'OS sont dûes à l'architecture sur
+     laquelle ils fonctionnent, par exemple les tailles de page mémoire
+     sur différents processeurs, ce qui peut éventuellement poser des
+     problèmes de performances ;
+
+
+
+  ·  certaines des modifications reposent sur des choix "politiques"
+     lors de l'implémentation de la pile IP (choix des numéros de
+     séquence, taille des fenêtres, options IP supportées). Les modifier
+     permet de tromper le détecteur mais peut poser problème lors de
+     communication légitimes, en détériorant les capacités de la pile IP
+     ou en affaiblissant sa sécurité, par exemple si la qualité générale
+     de la pile IP du système émulé (conformité avec la RFC, robustesse)
+     est inférieure à celle de la machine l'émulant.
+
+
+
+
+
+
+  Malgré tout, ces modifications sont réalisables dans la plupart des
+  cas pour la machine locale. En revanche, il n'en est pas de même pour
+  les machines routées, en effet :
+
+
+
+
+  ·  tous les tests ne peuvent être gérés par la machine locale, celle-
+     ci ne connaissant pas l'état précis de la pile IP des machines
+     routées, nécessaire pour générer les réponses adéquates ;
+
+
+
+  ·  les décisions prises par les machines routées ne peuvent être que
+     partiellement modifiées par la machine locale et ce de manière
+     permanente, la machine locale n'ayant pas de moyen de communiquer
+     ses modifications aux machines routées ;
+
+
+
+  ·  toute information perdue par les machines routées ne pourra être
+     restituée par la machine locale (à moins de conserver tout le
+     traffic, ce qui n'est pas réalisable) ;
+
+
+
+  ·  la machine locale ne doit pas inventer des informations. Par
+     exemple, si l'on prend le cadre d'un test auquel les machines ne
+     donnent aucune réponse, l'envoi d'une réponse par la machine locale
+     en lieu et place de la machine routée permettrait éventuellemnt de
+     répondre pour une machine inexistante.
+
+
+
+
+
+  33..  IIPP PPeerrssoonnaalliittyy
+
+
+
+  Au vu des contraintes précédentes, nous avons donc opté pour une
+  solution basée sur _n_e_t_f_i_l_t_e_r et _i_p_t_a_b_l_e_s  : en effet, l'architecte
+  d'_i_p_t_a_b_l_e_s a prévu une table mangle, justement prévue pour les
+  manipulations de paquets (par opposition aux tables filter et nat,
+  prévues pour le filtrage et la translation d'adresse, respectivement).
+  Nous avons donc créé une nouvelle target PERS (pour IP Personality),
+  qui effectue certaines opérations de réécriture sur les paquets qu'on
+  lui passe. Le système des règles permet de laisser à _i_p_t_a_b_l_e_s le soin
+  de sélectionner les paquets IP en fonction de leurs adresses et ports
+  source et destination, et les paramètres passés à la target PERS lui
+  donnent un comportement variable, réglable par l'administrateur, qui
+  peut ainsi définir quel type de réécriture il veut voir appliquer à
+  une catégorie de paquets.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  33..11..  FFoonnccttiioonnnnaalliittééss
+
+
+
+  Une fois installé et configuré correctement, IP Personality offre la
+  possibilité de leurrer nmap, et de lui faire croire que la machine
+  hôte fait tourner un système librement spécifié par l'administrateur.
+  Les paquets de test qu'envoie nmap sont pour la plupart anormaux, et
+  ceux qui ne le sont pas sont envoyés à des ports fermés, donc ils
+  n'influencent pas l'état de la pile TCP/IP locale : nous pouvons donc
+  les détourner sans scrupule, et émettre les réponses qui nous
+  conviennent. Le système de configuration de PERS permet de couvrir
+  tout l'éventail des possibilités de réponses, et ainsi nous pouvons
+  renvoyer à nmap des paquets caractéristiques de n'importe quel système
+  décrit dans sa base de signatures.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Certaines des opérations effectuées pour leurrer nmap (pas toutes
+  hélas) peuvent également être exécutées sur des paquets routés par
+  notre machine. Si nous perdons la capacité de tromper complètement
+  nmap, nos manipulations sont suffisamment efficaces pour l'empêcher de
+  détecter le système utilisé sur sa cible. Les opérations possibles sur
+  des paquets routés sont la réécriture des numéros de séquence et des
+  options TCP.
+
+
+
+
+
+
+  Au passage, nous gagnons également en robustesse dans le cas de
+  certaines réécritures. En particulier, les machines dont les
+  générateurs d'ISN trop simplistes les rendent vulnérables à des
+  attaques par prédiction de numéros de séquence peuvent ainsi être
+  protégées par notre target, qui leur offre un ISN parfaitement
+  aléatoire. De plus, grâce à la souplesse qu'offre la syntaxe du
+  fichier de configuration, les possibilités d'émulations ne sont pas
+  limitées aux outils de prise d'empreintes réseau existants : il
+  devient très facile sinon de tromper, du moins de perturber n'importe
+  quel outil raisonnant sur les mêmes bases que nmap, puisque nous avons
+  le contrôle des éléments caractéristiques d'un paquet.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Pour tenir compte des nombreuses possibilités de comportement d'une
+  pile IP, la configuration s'effectue via un fichier de configuration
+  complet détaillant les valeurs de différents paramètres. Ce fichier
+  est interprété et chargé dans l'espace noyau via une extension au
+  programe de configuration de _n_e_t_f_i_l_t_e_r, _i_p_t_a_b_l_e_s.  En particulier,
+  pour les cas de réécritures complexes dépendant de nombreux
+  paramètres, le fichier contient deux sections de "code" qui sont
+  interprétés dans le noyau (sous forme de pseudo code) pour analyser
+  plus finement les paquets selon des algorithmes analogues aux systèmes
+  émulés.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  33..22..  TTrraajjeett dd''uunn ppaaqquueett ddaannss PPEERRSS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                               +----->---->---+----+--->---->-----+
+                               | +---<----<---| VM |---<----<---+ |
+                               | |            +----+            | |
+                            +--+-+--+                           | |
+                        +->-| Decoy |->-+                       | |
+                        |   +-------+   | +-----+   +-----+   +-+-+-+
+                  +-->--+->--->--->--->-+-| SEQ |->-| WIN |->-| OPT |-+
+  +-----------+   | TCP                   +-----+   +-----+   +-----+ |
+  | IP Tables |->-+                                                   |--+
+  +-----------+   | UDP         +---------+                           |  |
+       |          +-->---->-----| Unreach |------>------>-------------+  |
+       |                        +---------+                              |
+       +-------<---------<--------<---------<----------<----------<------+
+
+                <==================== IP Personality ====================>
+
+
+
+
+
+  La cible PERS peut modifier les paquets qui lui sont passés par
+  l'architecture _n_e_t_f_i_l_t_e_r. Aussi, il est logique de l'utiliser au sein
+  de la table mangle spécialisée dans la modification des paquets.
+
+
+
+
+
+
+
+
+  Cette table accède à deux des points d'entrée de _n_e_t_f_i_l_t_e_r,
+  PRE_ROUTING et LOCAL_OUT. Afin de pouvoir réécrire correctement les
+  connexions, le module PERS a besoin de voir les deux sens d'une
+  connexion (nous verrons pourquoi par la suite).
+
+
+
+
+
+
+
+
+
+  Pour ce faire, on utilise deux règles configurées de manière identique
+  mais dont les critères sources et destinations sont symétriques. Pour
+  les paquets routés, les deux règles doivent se situer au le point
+  d'entrée PRE_ROUTING, puisque les paquets des deux directions sont
+  d'origine extérieure à la machine locale. En revanche en ce qui
+  concerne les communications avec la machine locale, si les paquets qui
+  lui sont envoyés passent bien par le point d'entrée PRE_ROUTING, il
+  n'en est pas de même pour les paquets qu'elle émet, ceux ci passant
+  par LOCAL_OUT.
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Pour chacune des règles utilisées pour réécrire un type de
+  communication, on précise au module si l'on souhaite protéger la
+  destination de la règle ou sa source à l'aide d'une option. En effet
+  selon le sens du paquet, certaines réécritures ne sont pas faites de
+  la même manière.
+
+
+
+
+
+
+
+
+
+  33..22..11..  CCaass dd''uunn ppaaqquueett TTCCPP
+
+
+
+  Si le paquet est destiné à la machine locale (c'est une option de la
+  target), on commence par l'envoyer dans le code de génération des
+  leurres : là le pseudo-code de la section tcp_decoy du fichier de
+  config détermine si le paquet peut continuer tel quel, ou sinon
+  (c'est-à-dire si le paquet a été identifié comme étant pathologique),
+  s'il faut répondre, avec un leurre construit en fonction du paquet.
+
+
+
+
+
+
+
+
+
+
+
+  Si le paquet continue, il peut être modifié de plusieurs façons. En
+  particulier, le sens de circulation, qu'on peut déterminer grâce aux
+  informations du module conntrack d'_i_p_t_a_b_l_e_s et aux paramètres de la
+  règle en cours, définit le sens de la réécriture. Les altérations
+  possibles sont :
+
+
+
+
+
+
+
+
+
+
+  ·   llaa rrééééccrriittuurree ddeess nnuumméérrooss ddee ssééqquueennccee :: si l'on veut pouvoir
+     simuler des générateurs de numéros de séquence initiaux, on veut
+     aussi que ce qui suit l'établissement d'une connexion fonctionne
+     convenablement. Il faut donc réécrire les numéros de séquence et
+     d'acquittement de tous les paquets d'une connexion dont on a changé
+     l'ISN. La première réécriture se fait au moment du choix de l'ISN
+     par l'un des générateurs de PERS (le fichier de configuration
+     détermine lequel et avec quels paramètres) : à ce moment, on
+     sauvegarde la différence entre l'ISN original et celui choisi par
+     PERS.  Cette différence entre les numéros de séquence utilisés par
+     les deux parties restant constante, il suffit de l'ajouter aux
+     numéros de séquence dans un sens et de la soustraire aux
+     acquittements dans l'autre ;
+
+
+
+  ·   llaa rrééééccrriittuurree ddeess ttaaiilllleess ddee ffeennêêttrree :: la taille de fenêtre
+     initiale étant un élément caractéristique, nous voulons pouvoir la
+     contrôler. Mais comme dans le cas des numéros de séquence, il faut
+     ensuite assumer ce choix et limiter la taille de fenêtre en
+     conséquence ;
+
+
+
+
+
+
+
+
+  ·   llaa rrééééccrriittuurree ddeess ooppttiioonnss :: lorsqu'une connexion est établie, les
+     piles TCP échangent des informations utiles par le biais
+     d'options : ce sont des champs optionnels de l'en-tête TCP, placés
+     entre l'en-tête normale et les données. Le type des options
+     utilisées et leur ordre est un élément caractéristique que nous
+     pouvons modifier : c'est ce qui est fait en interprétant le pseudo-
+     code de la section tcp_options. Ce code effectue des tests sur le
+     type et la valeur des options, ainsi que sur les flags du paquet
+     TCP, pour construire un nouveau bloc d'options qui remplace
+     l'ancien dans le paquet TCP.
+
+
+
+
+
+
+
+
+
+
+
+
+
+  33..22..22..  CCaass dd''uunn ppaaqquueett UUDDPP
+
+
+
+  Les paquets UDP qui sont simplement routés sont ignorés. Ceux qui sont
+  destinés à la machine locale sont examinés pour vérifier qu'ils sont
+  bien destinés à un port UDP ouvert : si c'est bien le cas, ils
+  continuent leur chemin tels quels ; dans le cas contraire, ils sont
+  détruits et PERS prend en charge l'émission d'un message ICMP de type
+  "Port Unreachable", car nmap examine les caractéristiques de ce
+  message.
+
+
+
+
+
+
+
+
+
+
+  Ce genre de message est un paquet IP contenant une en-tête ICMP suivie
+  du début du paquet IP ayant provoqué l'erreur. Le fichier de
+  configuration permet de contrôler chacun des éléments du paquet
+  utilisés par nmap pour identifier un système.
+
+
+
+
+
+  33..22..33..  PPaarrttiiee ccoommmmuunnee ddeess ppaacckkeettss IIPP
+
+
+
+  Après la réécriture potentielle des paquets UDP/TCP, l'ensemble des
+  paquets IP peuvent également être modifés. Une seule modification est
+  apportée pour le moment et consiste à modifier l'identifiant du paquet
+  (IP ID) pour une valeur générée selon un modèle prédéfini (de manière
+  analogue aux numéros de séquences TCP).
+
+
+
+
+
+
+
+
+
+  44..  CCoonnffiigguurraattiioonn
+
+
+
+  La configuration de PERS s'effectue en espace utilisateur à l'aide de
+  la commande _i_p_t_a_b_l_e_s et d'une bibliothèque dynamique associée
+  permettant de lui  passer tous ses paramètres spécifiques. Cette
+  bibliothèque ajoute à _i_p_t_a_b_l_e_s de nouvelles options applicables à
+  chaque règle dont la cible est PERS ; l'une de ces options permet
+  l'utilisation d'un fichier de configuration  détaillé regroupant
+  l'ensemble des paramètres nécessaires à l'émulation d'un système
+  d'exploitation particulier. Via l'utilisation de fichiers de
+  configuration différents pour chaque règle différente on peut donc
+  très librement choisir d'émuler un système particulier en fonction
+  d'adresses sources et destinations, de l'interface, et autres critères
+  de sélection dans les règles.
+
+
+
+
+
+
+
+
+
+
+
+
+
+  44..11..  OOppttiioonnss eenn lliiggnnee ddee ccoommmmaannddee
+
+
+  Les options de la ligne commande sont passées à la cible lors de
+  l'ajout d'une règle l'utilisant par exemple avec une syntaxe du type :
+
+
+
+
+  iptables -A <chaine> -s <source> -d <destination> -j PERS <options>
+
+  [Se référer à la documentation d'_i_p_t_a_b_l_e_s pour plus de détails sur la
+  syntaxe globale]
+
+
+
+  Les options reconnues par la bibliothèque sont :
+
+
+  ·  _-_t_w_e_a_k _{_s_r_c_|_d_s_t_}  : Cette option permet de spécifier le sens de
+     réécriture pour la règle considérée. Si elle vaut src cela signifie
+     que l'on souhaite protéger la source des paquets (et ainsi on va
+     par exemple réécrire les numéros de séquence des paquets d'une
+     connexion). Si elle vaut dst, alors on souhaite protéger la
+     destination de la règle (et ainsi on réécrirait par exemple les
+     acquittements de la connexion).
+
+
+
+
+
+  ·  _-_l_o_c_a_l  : Cete option spécifie que la source ou la destination de
+     la règle (selon la valeur de l'option tweak) est locale, ce qui a
+     pour effet d'activer les modules "decoy" et "udp" (si ceux-ci sont
+     définis dans le fichier de configuration) permettant ainsi de
+     tromper complètement des outils de type nmap en local.
+
+
+
+
+  ·  _-_c_o_n_f _<_f_i_c_h_i_e_r_> : Cette option permet de spécifier le fichier de
+     configuration à utiliser pour le système émulé au sein de cette
+     règle (cf ci après).
+
+
+
+  44..22..  FFiicchhiieerr ddee ccoonnffiigguurraattiioonn
+
+
+
+  Les paramètres concernant l'émulation d'un système particulier se
+  définissent au sein d'un fichier. Ce fichier utilise une syntaxe
+  proche de named.conf, inspirée du langage C. Les options de
+  configuration sont regroupées dans des blocs (délimités par des { et
+  }) et chaque bloc de configuration correspond à un type de réécriture
+  différent. Chaque option est constituée d'un identifiant suivi d'un ou
+  plusieurs arguments et terminée par un symbole ;.  Les options et les
+  blocs peuvent être spécifiés dans n'importe quel ordre.
+
+
+
+
+
+
+
+
+
+
+
+
+  44..22..11..  IIddeennttiiffiiccaattiioonn
+
+
+
+  Le premier élément d'un fichier de configuration est une
+  identification du système qu'il décrit. Il s'agit d'une chaîne d'au
+  plus 20 caractères décrivant le système. La syntaxe est la suivante :
+
+
+
+
+
+
+
+
+   id "FakeOS";
+
+
+
+
+
+  44..22..22..  PPaarraammèèttrreess ggéénnéérriiqquueess TTCCPP
+
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée _t_c_p.
+  Exemple :
+
+
+
+
+
+
+
+
+         tcp {
+           incoming yes;
+           outgoing no;
+           max-window 65536;
+         }
+
+
+
+
+  Le paramètre _i_n_c_o_m_i_n_g définit si l'on souhaite activer les
+  modifications opérant sur des connexions TCP (ISN, taille de fenêtre,
+  et Options) pour les connexions entrantes vers la zone protégée. Il
+  peut prendre les valeurs _y_e_s ou _n_o.
+
+
+
+
+
+  Le paramètre _o_u_t_g_o_i_n_g est analogue pour les connexions sortantes de la
+  zone protégée.
+
+
+
+  Le paramètre _m_a_x_-_w_i_n_d_o_w contrôle la réécriture de la taille de fenêtre
+  sur les paquets TCP des connexions correpondant aux réglages
+  précédents. Si il est défini à une valeur non nulle, alors pour toute
+  nouvelle connexion dont la taille de fenêtre lui est supérieure, un
+  décalage est calculé et la taille de fenêtre est ramenée à une valeur
+  inférieure à ce paramètre sur toute la durée de la connexion.
+
+
+
+
+
+
+
+
+  44..22..33..  PPaarraammèèttrreess ddee ggéénnéérraatteeuurr ddee nnuumméérrooss ddee ssééqquueennccee
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée _t_c_p___i_s_n.
+  Exemple :
+
+
+
+
+         tcp_isn {
+           type random-inc 10000;
+           initial-value 2600;
+         }
+
+
+
+
+  Le paramètre _t_y_p_e décrit le type de générateur à émuler ainsi qu'une
+  éventuelle option de cet émulation. Les types suivants sont
+  implémentés :
+
+
+
+
+  ·  _f_i_x_e_d_-_i_n_c _<_n_u_m_b_e_r_>  : Il s'agit du générateur le plus simple. Le
+     numéro de séquence initial de chaque connexion est tout simplement
+     incrémenté d'une valeur constante (passée en argument) à chaque
+     nouvelle connexion. L'utilisation de la valeur 0 comme incrément
+     permet d'émuler les systèmes utilisant des numéros de séquence
+     initiaux constants.
+
+
+
+
+  ·  _r_a_n_d_o_m_-_i_n_c _<_n_u_m_b_e_r_>  : Il s'agit d'un générateur semi-aléatoire. A
+     chaque nouvelle connexion le numéro de séquence initial est
+     incrémenté d'une valeur aléatoire entre 0 et le paramètre fourni.
+     C'est le type de générateur utilisé sur les systèmes Linux,
+     FreeBSD, etc... La robustesse d'un tel générateur est déterminé par
+     la taille du paramètre.
+
+
+
+
+
+  ·  _t_r_u_e_-_r_a_n_d_o_m  : Il s'agit d'un générateur complètement aléatoire. A
+     chaque nouvelle connexion, le numéro de séquence est généré de
+     manière purement aléatoire (en utilisant le générateur aléatoire à
+     entropie variable du noyau).
+
+
+
+  ·  _b_u_i_l_t_i_n  : Il s'agit du générateur de base du système courant. Sous
+     Linux il s'agit donc d'un gérérateur à incréments aléatoires.
+
+
+  ·  _t_i_m_e_-_d_e_p _<_n_u_m_b_e_r_>  : Il s'agit d'un générateur dépendant du temps.
+     Le nombre passé en paramètre indique la fréquence de progression du
+     générateur (en Hz). Par exemple, une valeur de 25000 permet
+     d'implémenter le générateur décrit dans la RFC 793 : le numéro de
+     séquence initial est alors incrémenté de 1 toutes les 4 micro-
+     secondes. (la granularité du générateur dépend toutefois de la
+     précsion des "ticks" du système, 100 Hz par défaut sous linux/x86)
+
+
+
+
+
+
+  Le paramètre _i_n_i_t_i_a_l_-_v_a_l_u_e décrit la valeur initiale à utiliser pour
+  le générateur de numéro de séquence. Il peut s'agir d'une valeur
+  numérique ou bien du mot-clé _r_a_n_d_o_m qui choisira une valeur aléatoire
+  lors de l'insertion de la règle.  Ce paramètre a peu d'importance pour
+  les types de générateurs peu prédictibles.
+
+  44..22..44..  PPaarraammèèttrreess ddee ggéénnéérraatteeuurr dd''IIddeennttiiffiiaannttss IIPP
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée _i_p___i_d.
+  Exemple :
+
+
+
+
+
+
+
+         ip_id {
+           type broken-inc 1;
+           initial-value 2600;
+         }
+
+
+
+
+  Le paramètre _t_y_p_e décrit le type de générateur à émuler ainsi qu'une
+  éventuelle option de cet émulation. Les même types que pour les
+  générateurs de numéros de séquences sont acceptés, et un choix
+  supplémentaire, _b_r_o_k_e_n_-_i_n_c _n_u_m_b_e_r est disponible : il s'agit d'un
+  compteur incrémenté de la valeur spécifiée à chaque utilisation, mais
+  dont le résultat est stoqué dans le paquet au format "little endian",
+  au lieu de l'ordre réseau.
+
+
+
+
+
+
+
+
+  44..22..55..  PPaarraammèèttrreess ddee rrééééoorrddoonnnnaanncceemmeenntt ddeess ooppttiioonnss
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée
+  _t_c_p___o_p_t_i_o_n_s.  Exemple :
+
+
+
+
+
+
+
+         tcp_options {
+           keep-unknown yes;
+           keep-unused no;
+           isolated-packets yes;
+           timestamp-scale 100;
+           code {
+             <code...>
+           }
+         }
+
+
+
+
+  Cette section définit comment les options TCP d'un paquet doivent être
+  réécrites. La sous-section _c_o_d_e contient un programme dans un langage
+  proche du C (décrit par la suite) qui est compilé par le module
+  _l_i_b_i_p_t___P_E_R_S_._s_o. Ce code est passé à la machine virtuelle qui remplit
+  le buffer d'options constituant son état au fer et à mesure de
+  l'exécution. Lorsque l'exécution est achevée, le buffer d'options
+  résultant est utilisé pour remplacer les options initiales du paquet.
+
+
+
+
+
+
+
+
+  Le paramètre _k_e_e_p_-_u_n_k_n_o_w_n spécifie si les options "inconnues"
+  présentes dans le paquet initial, et donc non manipulables par le
+  programme de réécriture, doivent être rajoutées à la fin du buffer
+  final afin d'être présentes dans le paquet final. Ce paramètre peut
+  prendre les valeurs _y_e_s ou _n_o.
+
+
+
+
+
+  Le paramètre _k_e_e_p_-_u_n_u_s_e_d spécifie si les options du paquet original
+  qui n'ont pas été utilisées (testées ou recopiées) pendant l'exécution
+  du programme doivent être recopiées à la fin du buffer afin d'être
+  présentes dans le paquet final. Ce paramètre peut prendre les valeurs
+  _y_e_s ou _n_o. Ceci permet d'utiliser un code assez simple pour réordonner
+  seulement quelques options tout en conservant toutes les options du
+  paquet original.
+
+
+
+
+
+
+
+  Le paramètre _i_s_o_l_a_t_e_d_-_p_a_c_k_e_t_s spécifie si la réécriture des options
+  doit être appliquée aux paquets n'appartenant à aucune connexion
+  connue. Ce paramètre peut prendre les valeurs _y_e_s ou _n_o (valeur par
+  défaut).
+
+
+
+
+
+  Le paramètre _t_i_m_e_s_t_a_m_p_-_s_c_a_l_e spécifie si l'on souhaite changer la
+  valeur des "timestamp" TCP dans les paquets communiquant avec la
+  machine locale. Il prend en argument la fréquence à utiliser pour les
+  nouveaux "timestamp". (si la valeur est nulle ou égale à la fréquence
+  nominale, l'option est ignorée).
+
+
+
+
+
+
+  44..22..66..  PPaarraammèèttrreess dduu lleeuurrrree TTCCPP
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée _t_c_p___d_e_c_o_y.
+  Exemple :
+
+
+
+
+
+
+
+
+    tcp_decoy {
+      code {
+        <code...>
+      }
+    }
+
+
+
+
+  Cette section se résume à une sous-section _c_o_d_e analogue à celle de la
+  section précédente, qui définit un certain nombre de tests à effectuer
+  sur le paquet initial afin de reconnaître des paquets caractéristiques
+  d'outils de détection et de répondre en conséquence. Le langage
+  utilisé est le même que précédemment (décrit ci après).
+
+
+
+
+
+
+  44..22..77..  PPaarraammèèttrreess dduu lleeuurrrree UUDDPP
+
+
+  Ces paramètres sont regroupés au sein d'une section nommée
+  _u_d_p___u_n_r_e_a_c_h.  Exemple :
+
+
+
+
+
+
+         udp_unreach {
+           reply yes;
+           df no;
+           max-len 56;
+           tos 0;
+
+           mangle-original {
+             ip-len 21;
+             ip-id same;
+             ip-csum zero;
+             udp-len 308;
+             udp-csum zero;
+             udp-data same;
+           }
+         }
+
+
+
+
+  Le paramètre _r_e_p_l_y détermine si l'on souhaite émettre un message ICMP
+  de type "port unreachable" lorsque l'on reçoit un message UDP pour un
+  port non ouvert localement. Il peut être défini à _y_e_s ou à _n_o. Les
+  autres paramètres de cette section s'appliquent si il est activé.
+
+
+
+
+
+  Le paramètre _d_f spécifie si le bit "Don't Fragment" de l'entête IP du
+  paquet ICMP doit être activé ou non.
+
+
+
+  Le paramètre _m_a_x_-_l_e_n spécifie la longueur maximum du message ICMP
+  généré en réponse.
+  Le paramètre _t_o_s spécifie la valeur du champ "Type Of service" dans
+  l'entête IP du paquet ICMP retourné.
+
+
+
+  Lors de l'envoi d'un message ICMP de type "port unreachable", une
+  portion du paquet initial est retournée dans le message. La section
+  _m_a_n_g_l_e_-_o_r_i_g_i_n_a_l permet de définir des modifications de cette portion
+  du message initial. Elle comprend les paramètres suivants :
+
+
+
+
+
+
+  ·  _i_p_-_l_e_n _{_s_a_m_e_|_<_n_u_m_b_e_r_>_}  : définit les modifications à apporter au
+     champ longueur de l'entête IP du paquet initial. Peut valoir _s_a_m_e
+     (dans ce cas la valeur est inchangée) ou une valeur numérique (dans
+     ce cas elle remplace la valeur initiale).
+
+
+
+  ·  _i_p_-_i_d _{_s_a_m_e_|_m_a_n_g_l_e_|_z_e_r_o_}  : définit les modifications à apporter au
+     champ id de l'entête IP du paquet initial. Peut valoir _s_a_m_e, _z_e_r_o
+     (la valeur est mise à zéro), _m_a_n_g_l_e (la valeur est changée pour une
+     valeur différente).
+
+
+
+
+
+  ·  _i_p_-_c_s_u_m _{_s_a_m_e_|_m_a_n_g_l_e_|_z_e_r_o_}  : définit les modifications à apporter
+     au champ checksum de l'entête IP du paquet initial. Peut valoir
+     _s_a_m_e, _z_e_r_o, _m_a_n_g_l_e.
+
+
+
+  ·  _u_d_p_-_l_e_n _{_s_a_m_e_|_<_n_u_m_b_e_r_>_}  : définit les modifications à apporter au
+     champ longueur de l'entête UDP du paquet initial. Peut valoir _s_a_m_e
+     ou une valeur numérique.
+
+
+
+  ·  _u_d_p_-_c_s_u_m _{_s_a_m_e_|_m_a_n_g_l_e_|_z_e_r_o_}  : définit les modifications à apporter
+     au champ checksum de l'entête UDP du paquet initial. Peut valoir
+     _s_a_m_e, _z_e_r_o, _m_a_n_g_l_e.
+
+
+
+
+  ·  _u_d_p_-_d_a_t_a _{_s_a_m_e_|_m_a_n_g_l_e_|_z_e_r_o_}  : définit les modifications à apporter
+     au premier octet de la zone de donnée du paquet UDP initial. Peut
+     valoir _s_a_m_e, _z_e_r_o, _m_a_n_g_l_e.
+
+
+
+
+
+  44..33..  LLaannggaaggee
+
+
+  Les sections _t_c_p___o_p_t_i_o_n_s et _t_c_p___d_e_c_o_y possèdent toutes deux un
+  paramètre code pouvant contenir un programme. Comme vu précédemment,
+  ce programme est compilé par la bibliothèque dynamique de _i_p_t_a_b_l_e_s
+  dans un pseudo-code interpété au sein du module noyau par une machine
+  virtuelle simple. Celle-ci opère sur un paquet TCP en entrée et gère
+  un état interne. Son état est composé de :
+
+
+
+
+
+
+
+
+
+  ·  Un buffer de stockage d'options TCP
+
+  ·  Plusieurs "registres" : _f_l_a_g_s, _m_s_s, _w_s_c_a_l_e, _w_i_n, _a_c_k et _d_f
+     correspondants aux champs TCP du même nom pour un éventuel paquet
+     de réponse.
+
+
+
+  Le code de la section _t_c_p___o_p_t_i_o_n_s est appliqué à un paquet TCP
+  entrant, et en fin de programme, le buffer d'options dans l'état de la
+  machine virtuelle est utilisé comme nouvelle liste d'options TCP pour
+  le paquet.
+
+
+
+
+
+
+  Le code de la section _t_c_p___d_e_c_o_y est également appliqué à un paquet TCP
+  entrant, mais le paquet n'est pas modifié. En fonction du type de
+  terminaison du programme, un nouveau paquet peut être construit à
+  partir de l'état de la machine virtuelle et renvoyé à la source du
+  paquet initial. Le paquet inital peut aussi être rejeté, ou continuer
+  son cheminement normal au sein de la cible.
+
+
+
+
+
+
+
+  Ces programmes peuvent être décrits avec un langage de syntaxe proche
+  du C. Des test conditionnels peuvent être effectués sur le paquet
+  initial afin de gérer le comportement en fonction de son contenu.
+
+
+
+
+  Un test a l'allure générale suivante :
+
+
+
+         if (test) {
+           <action>
+         }
+
+
+
+
+  ou
+
+
+
+
+
+
+    if (test) {
+      <action>
+    } else {
+      <action>
+    }
+
+
+
+
+  Un test est constitué d'une ou plusieurs conditions, séparées par les
+  opérateurs && et ||, et groupées par des parenthèses si besoin. Les
+  conditions reconnues par le langage sont :
+
+
+
+
+
+  ·  _o_p_t_i_o_n_(_o_p_t_)  : Vrai si l'option _o_p_t est présente dans le paquet
+     initial.
+
+  ·  _f_l_a_g_s_(_f_l_a_g_)  : Vrai si _f_l_a_g est activé dans le paquet initial.
+
+  ·  _f_l_a_g_s_(_f_l_a_g_1_&_f_l_a_g_2_&_._._._)   : Vrai si tous les flags spécifiés sont
+     activés dans le paquet initial.
+
+  ·  _f_l_a_g_s_(_f_l_a_g_1_|_f_l_a_g_2_|_._._._)   : Vrai si au moins un des flags spécifiés
+     est activé dans le paquet initial.
+
+
+  ·  _a_c_k_(_v_a_l_)  : Vrai si le champ acquittement de l'entête TCP du paquet
+     initial vaut _v_a_l.
+
+  ·  _l_i_s_t_e_n  : Vrai si le port destination du paquet initial est ouvert
+     sur la machine locale.
+
+  Le langage dispose de plusieurs instructions afin de manipuler l'état
+  interne de la machine virtuelle :
+
+
+
+
+  ·  _c_o_p_y_(_o_p_t_)  : Ceci provoque la copie de l'option _o_p_t du paquet
+     initial vers le buffer d'options de l'état interne de la machine
+     virtuelle si une telle option est disponible dans le paquet
+     initial.
+
+
+
+  ·  _i_n_s_e_r_t_(_o_p_t_, _v_a_l_)  : Ceci permet d'insérer une option dans le buffer
+     d'état en spécifiant sa valeur précisement. Une valeur numérique
+     peut être passée, ou alors une expression de type _t_h_i_s _+ _<_n_u_m_b_e_r_>
+     qui aura pour effet de donner à l'option la valeur qu'elle a dans
+     le paquet initial ajoutée à la valeur spécifiée.  Cette instruction
+     ne supporte que les options _m_s_s, _w_s_c_a_l_e et _t_i_m_e_s_t_a_m_p (dans ce cas
+     la valeur "this" correspond à la valeur courante utilisable pour le
+     timestamp local).
+
+
+
+
+
+
+
+  ·  _i_n_s_e_r_t_(_o_p_t_)  : équivalent à _i_n_s_e_r_t_(_o_p_t_, _t_h_i_s_).
+
+
+  ·  _s_e_t_(_a_r_g_, _v_a_l_)  : Ceci permet de définir un des registres internes
+     de la machine virtuelle. Les registres utilisables sont _f_l_a_g_s, _d_f,
+     _w_i_n et _a_c_k. Pour le registre _f_l_a_g_s, l'argument doit être une
+     combinaison valide de flags TCP comme pour les tests. Les arguments
+     _d_f et _w_i_n peuvent avoir leur valeur définie relativement à leur
+     valeur dans le paquet initial en utilisant la construction _t_h_i_s _+
+     _<_n_u_m_b_e_r_> vue précédemment.  Cette construction est également
+     valable pour le paramètre _a_c_k mais dans ce cas la valeur finale est
+     relative au numéro de séquence initial (et non à son numéro
+     d'acquitement).
+
+
+
+
+
+
+
+
+
+  ·  _d_r_o_p, _a_c_c_e_p_t, et _r_e_p_l_y : Ces instructions provoquent l'arrêt du
+     traitement du code en entrainant respectivement un abandon du
+     paquet, une continuation de traitement au sein de la cible, et
+     l'envoi d'une réponse construite à partir de l'état de la machine
+     virtuelle. L'action par défaut en fin de programme est _a_c_c_e_p_t.
+
+
+
+
+
+  Ce langage permet donc simplement de définir les comportements pour
+  réordonnancer les options ainsi que pour générer des réponses sur
+  mesure à des tests pathologiques pour tromper les outils de détection
+  de systèmes d'exploitation.
+
+
+
+
+  On peut faire les remarques suivantes :
+
+
+
+  ·  Compte tenu que le code de la section _t_c_p___o_p_t_i_o_n n'agit que sur les
+     options afin de le réordonner, seul le buffer d'option de l'état de
+     la machine virtuelle est utilisé suite à l'exécution du code. En
+     conséquence les tests _l_i_s_t_e_n et _a_c_k, et les instructions _i_n_s_e_r_t,
+     _s_e_t, _d_r_o_p, _r_e_p_l_y, bien que valides, y ont peu d'intêret.
+
+
+
+
+
+  ·  Les options supportées par les différents tests et conditions sont
+     tirées des différentes RFC les détaillant ; en voivi les noms :
+
+
+
+     _e_o_l, _n_o_p, _m_s_s, _w_s_c_a_l_e, _s_a_c_k_O_K, _s_a_c_k, _e_c_h_o, _e_c_h_o_r_e_p_l_y, _t_i_m_e_s_t_a_m_p,
+     _p_o_c_O_K, _p_o_c_S_P, _C_C, _C_C_._N_E_W, _C_C_._E_C_H_O, _a_c_r_e_q, _a_c_d_a_t_a.
+
+  ·  Les flags TCP supportés par les différents tests englobent la
+     totalité des 12 bits utilisables et sont représentés par les noms
+     suivants (du bit de poids faible au bit de poids fort) :
+
+
+
+     _f_i_n, _s_y_n, _r_s_t, _p_u_s_h, _a_c_k, _u_r_g, _e_c_e, _c_w_r, _b_o_g_1, _b_o_g_2, _b_o_g_3, _b_o_g_4.
+  55..  EExxeemmppllee
+
+
+
+  55..11..  FFiicchhiieerr ddee ccoonnffiigguurraattiioonn
+
+
+  Supposons que l'on souhaite réaliser un fichier de configuration pour
+  émuler un AmigaOS. Pour cela, on dispose de la signature nmap suivante
+  (se référer à la documentation de nmap pour plus de détails) :
+
+
+
+
+
+
+         Fingerprint AmigaOS AmiTCP/IP 4.3
+         TSeq(Class=64K)
+         T1(DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+         T2(Resp=N)
+         T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+         T4(DF=N%W=2000%ACK=O%Flags=R%Ops=)
+         T5(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
+         T7(DF=N%W=0%ACK=S%Flags=AR%Ops=)
+         PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+
+
+
+
+  Nous devons commencer la configuration par la définition d'un
+  identifiant, comme suit :
+
+
+
+
+
+         id "AmigaOS";
+
+
+
+
+  On souhaite réécrire les connexions TCP entrantes dans un premier
+  temps, et ne pas agir sur les tailles de fenêtres (simplement tromper
+  nmap), aussi utilise-t-on des valeurs génériques pour la section _t_c_p.
+
+
+
+
+
+
+         tcp {
+           incoming yes;
+           outgoing no;
+           max-window 32768;
+         }
+
+
+
+
+  La ligne _T_S_e_q de la signature nmap définit le type de générateur de
+  numéro de séquence initial utiliser. Le paramètre important en est la
+  classe du générateur. On peut rencontrer les classes suivantes :
+
+
+
+  ·  _C_l_a_s_s_=_C  : Générateur constant, correspondant à _f_i_x_e_d_-_i_n_c _0.
+
+  ·  _C_l_a_s_s_=_T_D  : Générateur dépendant du temps. On peut l'émuler avec un
+     générateur à incrément fixe faible de manière à satisfaire les
+     paramètres _g_c_d et _s_i. Il n'y a pas d'heuristiques particulière pour
+     cela, il faut donc essayer plusieurs valeurs différentes.
+
+
+
+  ·  _C_l_a_s_s_=_R_I  : Générateur à incréments aléatoires. Ce générateur est
+     émulé avec le mode _r_a_n_d_o_m_-_i_n_c. L'intervalle de recherche aléatoire
+     est déterminé par la difficulté retournée par nmap (_g_c_d et _s_i).
+     Même restrictions que précédemment.
+
+
+
+  ·  _C_l_a_s_s_=_T_R  : Générateur parfaitement aléatoire. émulé par _t_r_u_e_-
+     _r_a_n_d_o_m.
+
+  ·  _C_l_a_s_s_=_i_8_0_0, _C_l_a_s_s_=_6_4_K  : Incrémentation fixes, respectivement de
+     multiples de 800 et de 64000.
+
+  Ici on utilisera donc :
+
+
+
+
+         tcp_isn {
+           type fixed-inc 64000;
+           initial-value random;
+         }
+
+
+
+
+  Ensuite on trouve l'ensemble des tests TCP effectués par nmap au sein
+  des lignes _T_x. La syntaxe de ces lignes est toujours la même et décrit
+  l'éventuelle réponse reçue par nmap à son test.
+
+
+
+
+
+
+         Tx(Resp=Y%DF=Y%W=XXXX%ACK=S++%Flags=AS%Ops=M)
+
+
+
+
+  La signification des différents champs est la suivante :
+
+
+
+  ·  _R_e_s_p  : _Y si une réponse a été reçue, _N sinon.
+
+  ·  _D_F  : Indique si le bit "Don't Fragment" est positionné dans la
+     réponse
+
+  ·  _W  : Indique la ou les tailles de fenêtres (séparées par des "|")
+     attendues dans la réponse.
+
+
+  ·  _A_C_K  : Indique la valeur attendue pour l'acquittement dans la
+     réponse. Peut valoir une valeur numérique ou _S pour indiquer le
+     numéro de séquence du test, ou _S_+_+ pour indiquer le numéro de
+     séquence du test plus un.
+  ·  _F_l_a_g_s  : Contient les flags TCP activés dans la réponse, sous la
+     forme de leurs initiales repectives (_A pour _A_c_k, _S pour _S_y_n, ...).
+
+
+
+  ·  _O_p_s  : Contient la liste des options présentes suivant leur ordre
+     au sein de la réponse, sous forme de leurs initiales repectives (_M
+     pour _M_S_S, _N pour _N_O_P, ...) sauf pour _E qui signifie que l'option
+     précédente est de la même valeur que dans le paquet de test.
+
+
+
+
+  Si l'on souhaite émuler le système précisément, il faut déduire des
+  différents résultats l'ordre des options à partir des réponses que
+  nmap reçoit et des paquets initiaux auxquels elles correspondent. Ici,
+  on n'a qu'une option donc la section correspondante est assez simple :
+
+
+
+
+
+
+
+         tcp_options {
+           keep-unknown yes;
+           keep-unused no;
+           isolated-packets yes;
+           code {
+             copy(mss);
+           }
+         }
+
+
+
+
+  A ce stade le système ressemble un peu à celui émulé. En revanche sur
+  les tests très précis, nos réponses ne statisferont pas nmap. Afin de
+  le tromper complètement en local, on peut déduire des résultats aux
+  tests TCP les réponses à lui retourner au sein du mode _d_e_c_o_y.  Pour ce
+  faire on utilise un "squelette" de code adapté aux tests de nmap que
+  l'on complète afin de générer les réponses attendues :
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    tcp_decoy {
+      code {
+        if (option(mss)) {
+          if (listen) {
+            if (flags(syn&ece)) {
+              /* nmap test 1 */
+            }
+            if (flags(null)) {
+              /* nmap test 2 */
+            }
+            if (flags(syn&fin&urg&push)) {
+              /* nmap test 3 */
+            }
+            if (ack(0) && flags(ack) && !flags(syn|push|urg|rst)) {
+              /* nmap test 4 *
+            }
+          } else {
+            if (flags(syn) && !flags(ack)) {
+              /* nmap test 5 */
+            }
+            if (ack(0) && flags(ack) && !flags(syn|push|urg|rst)) {
+              /* nmap test 6 *
+            }
+            if (flags(fin&push&urg)) {
+              /* nmap test 7 */
+            }
+          }
+        }
+      }
+    }
+
+
+
+
+  Et il n'y a plus qu'à écrire le code pour chaque test, par exemple
+  pour le premier
+
+
+
+
+
+         set(df, 0);
+         set(win, 0x1F0E);
+         set(ack, this + 1);
+         set(flags, ack|syn);
+         insert(mss, this+1);
+         reply;
+
+
+
+
+  ou pour le second (pas de réponse) :
+
+
+
+
+         drop;
+
+
+
+
+  Enfin on peut également réagir localement (au sein de la section
+  _u_d_p___d_e_c_o_y) au dernier test de nmap, le test UDP port-unreach (_P_U), qui
+  a la syntaxe suivante :
+
+
+         PU(DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+
+
+
+
+  La signification des différents champs est la suivante :
+
+
+  ·  _R_e_s_p  : Comme précédemment, correspond à l'option _r_e_p_l_y.
+
+  ·  _D_F  : Comme précédemment, correspond à l'option _d_f.
+
+  ·  _T_O_S  : Type Of Service, correspond à l'option _t_o_s.
+
+  ·  _I_P_L_E_N  : longueur du paquet ICMP. Peut-être définie via l'option
+     _m_a_x_-_l_e_n.
+
+
+     La réponse ICMP générée contient le début du paquet original
+     (comportement recommandé par les RFC). Nmap essaie de déterminer si
+     certaines portions en ont été changées au cours du traitement via
+     les paramètres suivants, correspondants à ceux de la section
+     _m_a_n_g_l_e_-_o_r_i_g_i_n_a_l.
+
+
+
+
+  ·  _R_I_D_, _R_I_P_C_K_, _U_C_K_, _D_A_T  : Ces paramètres définissent les
+     modifications apportées à (respectivement) l'ID IP original, le
+     checksum IP original, le checksum UDP original, les données
+     originales. Chacun de ces paramètres peut avoir une des trois
+     valeurs suivantes : _0 (mis à zéro), _F ("fucked", valeur changée), _E
+     (égal). Ces paramètres correspondent aux options suivantes (même
+     ordre) _i_p_-_i_d, _i_p_-_c_s_u_m, _u_d_p_-_c_s_u_m, _u_d_p_-_d_a_t_a qui peuvent prendre une
+     des valeurs suivantes :
+
+
+
+
+
+
+
+     _z_e_r_o, _m_a_n_g_l_e, _s_a_m_e.
+
+  ·  _R_I_P_L_E_N_, _U_L_E_N  : Ces paramètres décrivent les longeurs initiales des
+     paquets IP et UDP, correspondant aux options _i_p_-_l_e_n et _u_d_p_-_l_e_n.
+     Elles peuvent être définies à une valeur quelconque ou à _s_a_m_e pour
+     conserver les valeurs originales.
+
+
+
+  Ici, on pourrait donc utiliser ce qui suit :
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    udp_unreach {
+      reply yes;
+      df no;
+      max-len 56;
+      tos 0;
+
+      mangle-original {
+        ip-len 348;
+        ip-id same;
+        ip-csum zero;
+        udp-len 308;
+        udp-csum zero;
+        udp-data same;
+      }
+    }
+
+
+
+
+  Il n'y a plus qu'à tester ! Un tel fichier peut par la suite être
+  amélioré et optimisé afin d'être à la fois plus fiable (le
+  réordonnancement d'option et le générateur de numéros de séquence
+  initiaux ne sont pas simples à "deviner") et plus performant
+  (regrouper les tests, etc.).
+
+
+
+
+
+  55..22..  RRéésseeaauu ddee tteesstt
+
+
+  Afin de démontrer quelques unes des capacités du module IP
+  Personality, plaçons nous dans le cadre de deux réseaux réduits à une
+  machine, reliés via une machine routeur où tourne le module. La
+  configuration esr la suivante :
+
+
+
+
+
+
+
+       +---------+           +---------+           +---------+
+       | suskind |<--------->|   dse2  |<--------->|   dse1  |
+       +---------+           +---------+           +---------+
+
+
+
+
+  Les systèmes d'exploitation utilisés pour les tests sont sur chacune
+  des machines :
+
+
+
+  ·  suskind : FreeBSD-2.2.8-RELEASE.
+
+  ·  dse1 : Linux 2.2.14.
+
+  ·  dse2 : Linux 2.3.99pre6 (ippersonality).
+
+  On peut tout de suite vérifier que ces OS sont mutuellement
+  détectables à l'aide de nmap par exemple, à partir de chacune des
+  machines. (on a laissé les détails afin de voir en quoi ils changent
+  par la suite).
+
+  Si l'on effectue un nmap de suskind vers dse2 :
+
+
+
+
+         TCP Sequence Prediction: Class=random positive increments
+                                  Difficulty=2119945 (Good luck!)
+
+         Sequence numbers: 59CEAA9C 5987D082 59CC67D4 59598903 5983CC3D 5971B98C
+         Remote OS guesses: Linux 2.3.49 x86, Linux 2.3.99-pre2 x86
+         OS Fingerprint:
+         TSeq(Class=RI%gcd=1%SI=205909)
+         T1(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+         T2(Resp=N)
+         T3(Resp=Y%DF=Y%W=7C70%ACK=S++%Flags=AS%Ops=MNNTNW)
+         T4(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+         T5(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(Resp=Y%DF=Y%W=0%ACK=O%Flags=R%Ops=)
+         T7(Resp=Y%DF=Y%W=0%ACK=S++%Flags=AR%Ops=)
+         PU(Resp=Y%DF=Y%TOS=C0%IPLEN=164%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
+
+
+
+
+  On observe le même résultat avec un nmap de dse1 vers dse2.
+
+
+  Si l'on effectue un nmap de dse1 vers suskind :
+
+
+
+
+         TCP Sequence Prediction: Class=random positive increments
+                                  Difficulty=9819 (Worthy challenge)
+
+         Sequence numbers: 3B1E1359 3B1F0409 3B1F9BAB 3B201E56 3B20B8D2 3B217357
+         Remote operating system guess: FreeBSD 2.2.1 - 3.2
+         OS Fingerprint:
+         TSeq(Class=RI%gcd=1%SI=265B)
+         T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+         T2(Resp=N)
+         T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNWNNT)
+         T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+         T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+         T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+         PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+
+
+
+
+  On se donne maintenant 3 fichiers d'émulation de systèmes
+  d'exploitation, soit _a_m_i_g_a_o_s_._c_o_n_f, _l_i_n_u_x_._c_o_n_f, et _w_i_n_9_x_._c_o_n_f.
+
+
+
+
+  On décide de faire passer dse2 pour une machine windows auprès de
+  suskind. Il suffit d'utiliser les deux ligne suivantes (sur dse2) :
+
+
+
+
+
+
+
+    iptables -t mangle -A PREROUTING -s suskind -d dse2 -j PERS --tweak dst \
+      --local --conf win9x.conf
+    iptables -t mangle -A OUTPUT -s dse2 -d suskind -j PERS --tweak src \
+      --local --conf win9x.conf
+
+
+
+
+  On décide ensuite de faire passer dse2 pour une machine amiga auprès
+  de dse1. Il suffit de rajouter les deux lignes suivantes :
+
+
+
+
+
+         iptables -t mangle -A PREROUTING -s dse1 -d dse2 -j PERS --tweak dst \
+           --local --conf amigaos.conf
+         iptables -t mangle -A OUTPUT -s dse2 -d dse1 -j PERS --tweak src \
+           --local --conf amigaos.conf
+
+
+
+
+  Pour utiliser le rôle de routeur de la machine on veut également
+  modifier la manière dont dse1 voit suskind, en faisant passer suskind
+  pour une machine sous Linux.
+
+
+
+
+
+         iptables -t mangle -A PREROUTING -s suskind -d dse1 -j PERS --tweak src \
+           --conf linux.conf
+         iptables -t mangle -A PREROUTING -s dse1 -d suskind -j PERS --tweak dst \
+           --conf linux.conf
+
+
+
+
+  Voyons maintenant ce que donnent les même tests que précédemment (avec
+  nmap).
+
+
+  Si l'on effectue un nmap de suskind vers dse2 :
+
+
+
+
+         TCP Sequence Prediction: Class=trivial time dependency
+                                  Difficulty=0 (Trivial joke)
+
+         Sequence numbers: A97ECB1D A97ECB1F A97ECB21 A97ECB23 A97ECB25 A97ECB27
+         Remote operating system guess: Windows NT4 / Win95 / Win98
+         OS Fingerprint:
+         TSeq(Class=TD%gcd=2%SI=0)
+         T1(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+         T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+         T3(Resp=Y%DF=Y%W=2017%ACK=S++%Flags=AS%Ops=M)
+         T4(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+         T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(Resp=Y%DF=N%W=0%ACK=S++%Flags=R%Ops=)
+         T7(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         PU(Resp=N)
+
+
+
+  Si l'on effectue un nmap de dse1 vers dse2 :
+
+
+
+
+         TCP Sequence Prediction: Class=64K rule
+                                  Difficulty=1 (Trivial joke)
+
+         Sequence numbers: D997B378 D998AD78 D999A778 D99AA178 D99B9B78 D99C9578
+         Remote operating system guess: AmigaOS AmiTCP/IP 4.3
+         OS Fingerprint:
+         TSeq(Class=64K)
+         T1(Resp=Y%DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+         T2(Resp=N)
+         T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+         T4(Resp=Y%DF=N%W=2000%ACK=O%Flags=R%Ops=)
+         T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+         T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+         PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+
+
+
+
+  Si l'on effectue un nmap de dse1 vers suskind :
+
+
+
+         TCP Sequence Prediction: Class=random positive increments
+                                  Difficulty=188907 (Good luck!)
+
+         Sequence numbers: 32BD32 393D33 3B87EE 3FE6A3 4AC5E7 4F9533
+         No OS matches for host (If you know what OS is running on it,
+         see http://www.insecure.org/cgi-bin/nmap-submit.cgi).
+         TCP/IP fingerprint:
+         TSeq(Class=RI%gcd=1%SI=2EF4C)
+         TSeq(Class=RI%gcd=1%SI=2EF18)
+         TSeq(Class=RI%gcd=1%SI=2E1EB)
+         T1(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+         T2(Resp=N)
+         T3(Resp=Y%DF=Y%W=403D%ACK=S++%Flags=AS%Ops=MNNTNW)
+         T4(Resp=Y%DF=N%W=4000%ACK=O%Flags=R%Ops=)
+         T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+         T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+         T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+         PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=0%ULEN=134%DAT=E)
+
+
+
+
+  On constate bien que dans le cas de la machine locale dse2 on peut
+  complètement tromper nmap. En revanche en mode "routeur", les
+  paramètres sur lesquels on joue le perturbent, mais ne suffisent pas à
+  lui faire détecter un autre système.
+
+
+
+
+
+
+  66..  PPsseeuuddoo CCooddee
+
+  66..11..  GGéénnéérraalliittééss
+
+
+
+  Nous avons implémenté une machine virtuelle simple au sein du noyau.
+  Celle-ci opère sur un paquet TCP en entrée et gère un état interne.
+  Son état est composé de :
+
+
+
+
+  ·  Un pointeur d'instruction dans le code.
+
+  ·  Un buffer de stockage d'options TCP.
+
+  ·  Plusieurs "registres" :
+
+     _f_l_a_g_s, _m_s_s, _w_s_c_a_l_e, _w_i_n, _a_c_k et _d_f correspondants aux champs TCP du
+     même nom pour un éventuel paquet de réponse.
+
+
+  Le code executé par la machine virtuelle est composé d'instructions
+  sur 32 bits (en ordre de la machine) regroupant un mnémonique (sur 8
+  bits), une option (sur 4 bits) et un opérande (sur 20 bits), comme
+  visible ci après.
+
+
+
+
+
+
+       0              7 8     11 12                                    31
+       +---------------+--------+---------------------------------------+
+       |    Mnemonic   | Option |              Operand                  |
+       +---------------+--------+---------------------------------------+
+
+
+
+
+
+  66..22..  IInnssttrruuccttiioonnss
+
+
+
+  66..22..11..  TTEESSTT
+
+
+  CCooddee :: 01
+
+  Effectue un test sur l'objet défini par l'option. Si le test est vrai,
+  le pointeur d'instruction passe de l'instruction _i à l'instruction
+  _i_+_2. Si le test est faux, l'exécution se continue à l'instruction _i_+_1.
+
+
+
+
+
+  Les options des tests sont les suivantes :
+
+
+
+  ·  _T_C_P _O_p_t_i_o_n (0)  : Vrai si l'option TCP dont le code est passé en
+     opérande est défini dans le paquet initial.
+
+
+
+  ·  _A_n_y _T_C_P _F_l_a_g_s (1)  : Vrai si un des flags TCP passés en opérande
+     est activé dans les flags TCP du paquet initial.
+
+
+  ·  _A_l_l _T_C_P _F_l_a_g_s (2)  : Vrai si tous les flags TCP passés en opérande
+     sont activés dans les flags TCP du paquet initial.
+
+
+
+  ·  _A_c_k (3)  : Vrai si la valeur de l'acquittement du paquet initial
+     vaut l'opérande.
+
+
+  ·  _L_i_s_t_e_n (4)  : Vrai si le port destination du paquet initial est
+     ouvert sur la machine locale.
+
+
+
+  66..22..22..  JJMMPP
+
+
+  CCooddee :: 02
+
+  Continue l'exécution à l'instruction dont le numéro est l'opérande.
+
+
+
+  66..22..33..  PPUUTT
+
+
+  CCooddee :: 03
+
+  Insère une option TCP dans le buffer d'options TCP. L'option TCP
+  insérée est l'opérande, sa source est déterminée par l'option de
+  l'instruction.
+
+
+
+
+  Les options sont les suivantes :
+
+
+
+  ·  _C_o_p_y (0)  : L'option insérée est copiée à partir du paquet initial
+     si elle y est définie.
+
+
+  ·  _I_n_s_e_r_t (1)  : L'option insérée est copiée à partir des registres de
+     la machine virtuelle. Uniquement valable pour les options _m_s_s,
+     _w_s_c_a_l_e and _t_i_m_e_s_t_a_m_p.
+
+
+
+
+
+  66..22..44..  SSEETT
+
+
+  CCooddee :: 04
+
+  Définit la valeur d'un registre de la machine virtuelle. Le registre
+  concerné et le type d'affectation sont déterminés par l'option. La
+  valeur utilisée est l'opérande.
+
+
+
+
+  Les options acceptées sont les suivantes :
+
+
+  ·  _f_l_a_g_s (0)  : Définit le registre _f_l_a_g_s à la valeur de l'opérande.
+
+
+  ·  _a_c_k (1)  : Définit le registre _a_c_k (acquittement) à la valeur de
+     l'opérande.
+
+
+  ·  _d_f (2)  : Définit le registre _d_f (bit "Don't Fragment" de l'entête
+     IP) à la valeur de l'opérande.
+
+
+  ·  _w_i_n (3)  : Définit le registre _w_i_n (taille de fenêtre) à la valeur
+     de l'opérande.
+
+
+  ·  _m_s_s (4)  : Définit le registre _m_s_s (taille de segment TCP maximale)
+     à la valeur de l'opérande.
+
+
+  ·  _w_s_c_a_l_e (5)  : Définit le registre _w_s_c_a_l_e (mise à l'échelle de la
+     fenêtre) à la valeur de l'opérande.
+
+
+  ·  _t_i_m_e_s_t_a_m_p (6)  : Définit le registre _t_i_m_e_s_t_a_m_p (valeur locale du
+     timestamp) à la valeur de l'opérande.
+
+
+  ·  _r_e_l_a_t_i_v_e _a_c_k (9)  : Définit le registre _a_c_k (acquittement) à la
+     valeur de l'opérande ajoutée au numéro de séquence du paquet
+     initial.
+
+
+
+  ·  _r_e_l_a_t_i_v_e _d_f (10)  : Définit le registre _d_f (bit "Don't Fragment" de
+     l'entête IP) à la valeur de l'opérande ajoutée à celle de la valeur
+     de ce champ dans le paquet initial.
+
+
+
+  ·  _r_e_l_a_t_i_v_e _w_i_n (11)  : Définit le registre _w_i_n (taille de fenêtre) à
+     la valeur de l'opérande ajoutée à la taille de fenêtre du paquet
+     initial.
+
+
+
+  ·  _r_e_l_a_t_i_v_e _m_s_s (12)  : Définit le registre _m_s_s (taille de segment TCP
+     maximale) à la valeur de l'opérande ajoutée à la valeur mss du
+     paquet initial (si définie).
+
+
+
+  ·  _r_e_l_a_t_i_v_e _w_s_c_a_l_e (13)  : Définit le registre wscale (mise à
+     l'échelle de la fenêtre) à la valeur de l'opérande ajoutée à la
+     valeur wscale du paquet initial (si définie).
+
+
+
+  ·  _r_e_l_a_t_i_v_e _t_i_m_e_s_t_a_m_p (14)  : Définit le registre _t_i_m_e_s_t_a_m_p (valeur
+     locale du timestamp) à la valeur de l'opérande ajoutée à la valeur
+     courante utilisable pour le timestamp.
+
+
+
+
+
+
+  66..22..55..  RREETT
+
+
+  CCooddee :: 05
+
+  Termine l'exécution du programme en retournant l'opérande.
+
+
+  Les opérandes acceptés sont les suivants :
+
+
+
+  ·  _A_c_c_e_p_t (1)  : Termine l'exécution et demande l'acceptation du
+     paquet pour continuer son traitement.
+
+
+  ·  _D_r_o_p (2)  : Termine l'exécution et demande l'abandon du paquet.
+
+
+  ·  _R_e_p_l_y (3)  : Termine l'exécution et demande l'envoi d'une réponse
+     basée sur l'état de la machine virtuelle.
+
+
+
+
+  66..33..  OOppttiioonnss TTCCPP
+
+
+  Pour les différentes instructions acceptant des options TCP, les
+  options suivantes sont reconnues :
+
+
+
+
+  ·  _e_o_l (0)
+
+  ·  _n_o_p (1)
+
+  ·  _m_s_s (2)
+
+  ·  _w_s_c_a_l_e (3)
+
+  ·  _s_a_c_k_O_K (4)
+
+  ·  _s_a_c_k (5)
+
+  ·  _e_c_h_o (6)
+
+  ·  _e_c_h_o_r_e_p_l_y (7)
+
+  ·  _t_i_m_e_s_t_a_m_p (8)
+
+  ·  _p_o_c_O_K (9)
+
+  ·  _p_o_c_S_P (10)
+
+  ·  _C_C (11)
+
+  ·  _C_C_._N_E_W (12)
+
+  ·  _C_C_._E_C_H_O (13)
+
+  ·  _a_c_r_e_q (14)
+
+  ·  _a_c_d_a_t_a (15)
+
+  77..  OOuuttiillss ddee ddéévveellooppppeemmeenntt
+
+
+
+  77..11..  DDeebbooggaaggee
+
+
+  Afin de pouvoir suivre le fonctionnement du module, un certain nombre
+  d'informations de debogage peuvent être imprimées dans le buffer de
+  messages du noyau au fer et à mesure de l'analyse et de la
+  modification des paquets. Par défaut les messages de debogage sont
+  désactivés, mais peuvent être activés par un sysctl, via le fichier
+  _/_p_r_o_c_/_s_y_s_/_n_e_t_/_i_p_v_4_/_i_p___p_e_r_s_o_n_a_l_i_t_y___d_e_b_u_g.
+
+
+
+
+
+
+  Le niveau de debogage est réglé par la valeur numérique associée à ce
+  paramètre : Chaque bit correspond à un des sous modules ce qui permet
+  de sélectionner finement les messages à afficher en combinant les bits
+  voulus comme ci après :
+
+
+
+
+
+  ·  _1  : Moteur central de la cible
+
+  ·  _2  : Modifications de numéros de séquence
+
+  ·  _4  : Modifications des options
+
+  ·  _8  : Modifications des fenêtres
+
+  ·  _1_6  : Leurres TCP locaux
+
+  ·  _3_2  : Machine virtuelle
+
+  ·  _6_4  : Leurres UDP locaux
+
+  ·  _1_2_8  : Modifications des identifiants IP
+
+  Exemple :
+
+
+
+
+         echo 35 > /proc/sys/net/ipv4/ip_personality_debug
+
+
+
+
+
+  77..22..  OOssddeett
+
+
+  Osdet est un outil de test tentant de découvrir le système
+  d'exploitation utilisé. Il a été développé à partir des sources de
+  nmap. Il effectue les mêmes tests que nmap, mais ce de manière
+  séquentielle en affichant pour chaque test le paquet envoyé et la
+  réponse éventuelle reçue (code adapté de tcpdump). Ceci permet
+  d'analyser finemement le comportement de la pile IP et de constater le
+  bon fonctionnement ou non du code noyau produit.
+
+  Exemple d'utilisation :
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  dse1:~# osdet -h
+  usage: osdet [-t n[-N],...] [-p port] [-P port] [-S ip] [-h] host
+    -p port    Sets openport (defaults to 23 (telnet)).
+    -P port    Sets closedport (defaults to a random high port).
+    -S ip      Sets source Ip for scans if multihomed.
+    -t ...     Selects a subset of tests to perform.
+
+  dse1:~# osdet -p 23 -P 234 dse2
+  OSDET v0.3 [using nmap backend version 2.53]
+
+  Trying to detect remote os of dse2 [172.20.30.2].
+  (assuming port 23 is open and port 234 is closed)
+  Using pcap filter: (icmp and dst host 172.20.30.1) or
+   (tcp and src host 172.20.30.2 and dst host 172.20.30.1)
+
+  * Test 1 (TCP to open port, SYN and BOGUS)
+    Sending packet... ok:
+      172.20.30.1.50925 > 172.20.30.2.23: S 26F7D60A:26F7D60A(0) win 3072
+       <wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 36252)
+    Waiting for answer... ok:
+      172.20.30.2.23 > 172.20.30.1.50925: S 6ECE0057:6ECE0057(0) ack 26F7D60B
+      win 7950 <mss 266> (ttl 255, id 59900)
+
+  * Test 2 (TCP to open port, NULL)
+    Sending packet... ok:
+      172.20.30.1.50926 > 172.20.30.2.23: . win 3072 <wscale 10,nop,mss
+      265, timestamp 3F3F3F3F 0,eol> (ttl 54, id 27188)
+    Waiting for answer... no reply.
+
+  * Test 3 (TCP to open port, SYN, FIN, URG and PUSH)
+    Sending packet... ok:
+      172.20.30.1.50927 > 172.20.30.2.23: SFP 26F7D60A:26F7D60A(0) win
+      3072 urg 0 <wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 28956)
+    Waiting for answer... ok:
+      172.20.30.2.23 > 172.20.30.1.50927: . ack 2 win 7950 (ttl 255, id 60156)
+
+  * Test 4 (TCP to open port, ACK 0)
+    Sending packet... ok:
+      172.20.30.1.50928 > 172.20.30.2.23: . ack 0 win 3072 <wscale
+      10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 7360)
+    Waiting for answer... ok:
+      172.20.30.2.23 > 172.20.30.1.50928: R 0:0(0) win 8192 (ttl 255, id 60412)
+
+  * Test 5 (TCP to closed port, SYN)
+    Sending packet... ok:
+      172.20.30.1.50929 > 172.20.30.2.234: S 26F7D60A:26F7D60A(0) win
+      3072 <wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 49268)
+    Waiting for answer... ok:
+      172.20.30.2.234 > 172.20.30.1.50929: R 0:0(0) ack 26F7D60B win 0 (ttl 255, id 60668)
+
+  * Test 6 (TCP to closed port, ACK 0)
+    Sending packet... ok:
+      172.20.30.1.50930 > 172.20.30.2.234: . ack 0 win 3072 <wscale
+      10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 53356)
+    Waiting for answer... ok:
+      172.20.30.2.234 > 172.20.30.1.50930: R 0:0(0) win 0 (ttl 255, id 60924)
+
+  * Test 7 (TCP to closed port, FIN, PUSH and URG)
+    Sending packet... ok:
+      172.20.30.1.50931 > 172.20.30.2.234: FP 26F7D60A:26F7D60A(0) win
+      3072 urg 0 <wscale 10,nop,mss 265,timestamp 3F3F3F3F 0,eol> (ttl 54, id 60119)
+    Waiting for answer... ok:
+      172.20.30.2.234 > 172.20.30.1.50931: R 0:0(0) ack 26F7D60A win 0 (ttl 255, id 61180)
+
+  * Test 8 (UDP to closed port, expecting ICMP unreach)
+    Sending packet... ok:
+      172.20.30.1.50932 > 172.20.30.2.234: udp 300 (ttl 60, id 36334)
+    Waiting for answer... ok:
+      172.20.30.2 > 172.20.30.1: icmp: 172.20.30.2 udp port 234 unreachable (ttl 255, id 61436)
+
+  * Test 9 (Initial Sequence Number)
+    Sending paquets... 26F7D60B 26F7D60C 26F7D60D 26F7D60E 26F7D60F 26F7D610; last is:
+      172.20.30.1.50939 > 172.20.30.2.23: S 26F7D610:26F7D610(0) win 3072 (ttl 54, id 777)
+    Waiting for answers... 9D128940[1] 9D138340[2] 9D147D40[3] 9D157740[4] 9D167140[5]
+      9D176B40[6]; last is:
+      172.20.30.2.23 > 172.20.30.1.50939: S 9D176B40:9D176B40(0) ack
+      26F7D611 win 32120 <mss 1460> (DF) (ttl 64, id 0)
+
+  * Nmap OS Fingerprint:
+    TSeq(Class=64K)
+    T1(Resp=Y%DF=N%W=1F0E%ACK=S++%Flags=AS%Ops=M)
+    T2(Resp=N)
+    T3(Resp=Y%DF=N%W=1F0E%ACK=O%Flags=A%Ops=)
+    T4(Resp=Y%DF=N%W=2000%ACK=O%Flags=R%Ops=)
+    T5(Resp=Y%DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+    T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
+    T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+    PU(Resp=Y%DF=N%TOS=0%IPLEN=38%RIPTL=15C%RID=E%RIPCK=0%UCK=0%ULEN=134%DAT=E)
+
+    TCP Sequence Prediction: Class=64K rule
+    Difficulty=1 (Trivial joke)
+
+  * Remote OS Guess: AmigaOS AmiTCP/IP 4.3
+
+
+
+
+
+  77..33..  PPeerrsscccc
+
+
+  La bibliothèque dynamique qui s'ajoute à iptables réalise l'analyse du
+  fichier de configuration et la compilation du code en pseudo-code pour
+  la machine virtuelle. Afin d'être sûr que l'interprétation de la
+  configuration du code, et que le code généré était correct, nous avons
+  réalisé un interprêteur de fichier de configuration et un
+  compilateur/désassembleur de code. Cet outil peut également être
+  utilisé pour simplement vérifier la bonne syntaxe d'un fichier de
+  configuration ou tester la longueur d'un code compilé.
+
+
+
+
+
+
+  Exemple d'utilisation :
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  dse2:~# percc example.conf
+  === config ===
+  id: Example
+  isn initialized: yes, value=877764155
+  isn type: true-random
+  rewrite way: ingoing outgoing
+  keep unknown options: yes
+  keep unused options: yes
+  max window: 0
+  change options for isolated packets: yes
+  udp-unreach:
+    reply: yes
+    df: yes
+    max-len: 500
+    tos: 0
+    ip-len: 0
+    ip-id: same
+    ip-csum: same
+    udp-len: 0
+    udp-csum: same
+    udp-data: mangle
+
+  === interpreted code #0 ===
+  if (flags(syn)) {
+    if (option(sackOK)) {
+      copy(sackOK);
+    } else {
+      copy(nop);
+      copy(nop);
+    }
+    copy(timestamp);
+    copy(mss);
+  } else {
+    if (option(sack)) {
+      copy(sack);
+    } else {
+      copy(nop);
+      copy(nop);
+    }
+    copy(timestamp);
+  }
+  code: 15 instructions.
+
+  === compiled code #0 ===
+  0000:  [01100002]  TEST    tcp_flags, syn
+  0001:  [0200000B]  JMP     000B
+  0002:  [01000004]  TEST    tcp_option, sackOK
+  0003:  [02000006]  JMP     0006
+  0004:  [03000004]  PUT     sackOK (copy)
+  0005:  [02000008]  JMP     0008
+  0006:  [03000001]  PUT     nop (copy)
+  0007:  [03000001]  PUT     nop (copy)
+  0008:  [03000008]  PUT     timestamp (copy)
+  0009:  [03000002]  PUT     mss (copy)
+  000A:  [02000012]  JMP     0012
+  000B:  [01000005]  TEST    tcp_option, sack
+  000C:  [0200000F]  JMP     000F
+  000D:  [03000005]  PUT     sack (copy)
+  000E:  [02000011]  JMP     0011
+  000F:  [03000001]  PUT     nop (copy)
+  0010:  [03000001]  PUT     nop (copy)
+  0011:  [03000008]  PUT     timestamp (copy)
+  asm: 18 instructions.
+
+  === interpreted code #1 ===
+  if (option(mss)) {
+    set(df, 0);
+    if (listen) {
+      if (flags(syn&ece)) {
+        set(win, 7950);
+        set(ack, this + 1);
+        set(flags, syn|ack);
+        insert(mss, this + 1);
+        reply;
+      }
+      if (flags(null)) {
+        drop;
+      }
+      if (flags(fin&syn&urg&push)) {
+        set(win, 7950);
+        set(ack, 2);
+        set(flags, ack);
+        reply;
+      }
+      if ((ack(0) && flags(ack)) && !flags(syn|urg|push|rst)) {
+        set(win, 8192);
+        set(ack, 2);
+        set(flags, rst);
+        reply;
+      }
+    } else {
+      set(win, 0);
+      if (flags(syn) && !flags(ack)) {
+        set(ack, this + 1);
+        set(flags, ack|rst);
+        reply;
+      }
+      if ((ack(0) && flags(ack)) && !flags(syn|urg|push|rst)) {
+        set(ack, 2);
+        set(flags, rst);
+        reply;
+      }
+      if (flags(fin&urg&push)) {
+        set(ack, this + 0);
+        set(flags, ack|rst);
+        reply;
+      }
+    }
+  }
+  code: 53 instructions.
+
+  === compiled code #1 ===
+  0000:  [01000002]  TEST    tcp_option, mss
+  0001:  [0200003A]  JMP     003A
+  0002:  [04200000]  SET     df, 0
+  0003:  [01400000]  TEST    listen
+  0004:  [02000022]  JMP     0022
+  0005:  [01200042]  TEST    tcp_flags, syn&ece
+  0006:  [0200000D]  JMP     000D
+  0007:  [04301F0E]  SET     win, 7950
+  0008:  [04900001]  SET     ack, this + 1
+  0009:  [04000012]  SET     flags, syn|ack
+  000A:  [04C00001]  SET     mss, this + 1
+  000B:  [03100002]  PUT     mss (insert)
+  000C:  [05000003]  RET     reply
+  000D:  [01100000]  TEST    tcp_flags, null
+  000E:  [02000010]  JMP     0010
+  000F:  [05000002]  RET     drop
+  0010:  [0120002B]  TEST    tcp_flags, fin&syn&urg&push
+  0011:  [02000016]  JMP     0016
+  0012:  [04301F0E]  SET     win, 7950
+  0013:  [04100002]  SET     ack, 2
+  0014:  [04000010]  SET     flags, ack
+  0015:  [05000003]  RET     reply
+  0016:  [01300000]  TEST    ack, 0
+  0017:  [0200003A]  JMP     003A
+  0018:  [01100010]  TEST    tcp_flags, ack
+  0019:  [0200003A]  JMP     003A
+  001A:  [0110002E]  TEST    tcp_flags, syn|urg|push|rst
+  001B:  [0200001D]  JMP     001D
+  001C:  [0200003A]  JMP     003A
+  001D:  [04302000]  SET     win, 8192
+  001E:  [04100002]  SET     ack, 2
+  001F:  [04000004]  SET     flags, rst
+  0020:  [05000003]  RET     reply
+  0021:  [0200003A]  JMP     003A
+  0022:  [04300000]  SET     win, 0
+  0023:  [01100002]  TEST    tcp_flags, syn
+  0024:  [0200002B]  JMP     002B
+  0025:  [01100010]  TEST    tcp_flags, ack
+  0026:  [02000028]  JMP     0028
+  0027:  [0200002B]  JMP     002B
+  0028:  [04900001]  SET     ack, this + 1
+  0029:  [04000014]  SET     flags, ack|rst
+  002A:  [05000003]  RET     reply
+  002B:  [01300000]  TEST    ack, 0
+  002C:  [02000035]  JMP     0035
+  002D:  [01100010]  TEST    tcp_flags, ack
+  002E:  [02000035]  JMP     0035
+  002F:  [0110002E]  TEST    tcp_flags, syn|urg|push|rst
+  0030:  [02000032]  JMP     0032
+  0031:  [02000035]  JMP     0035
+  0032:  [04100002]  SET     ack, 2
+  0033:  [04000004]  SET     flags, rst
+  0034:  [05000003]  RET     reply
+  0035:  [01200029]  TEST    tcp_flags, fin&urg&push
+  0036:  [0200003A]  JMP     003A
+  0037:  [04900000]  SET     ack, this + 0
+  0038:  [04000014]  SET     flags, ack|rst
+  0039:  [05000003]  RET     reply
+  asm: 58 instructions.
+
+
+
+
+
+  88..  BBiibblliiooggrraapphhiiee
+
+
+
+  ·  J. Postel. _I_n_t_e_r_n_e_t _P_r_o_t_o_c_o_l, Request for Comments 791. Network
+     Working Group, 09/1981.
+
+  ·  J. Postel. _I_n_t_e_r_n_e_t _C_o_n_t_r_o_l _M_e_s_s_a_g_e _P_r_o_t_o_c_o_l, Request for Comments
+     792. Network Working Group, 09/1981.
+
+  ·  J. Postel. _T_r_a_n_s_m_i_s_s_i_o_n _C_o_n_t_r_o_l _P_r_o_t_o_c_o_l, Request for Comments 793.
+     Network Working Group, 09/1981.
+
+  ·  V. Jacobson, R. Braden. _T_C_P _E_x_t_e_n_s_i_o_n_s _f_o_r _L_o_n_g_-_D_e_l_a_y _P_a_t_h_s,
+     Request for Comments 1072. Network Working Group, 10/1988.
+
+  ·  J. Zweig, C. Partridge. _T_C_P _A_l_t_e_r_n_a_t_e _C_h_e_c_k_s_u_m _O_p_t_i_o_n_s, Request for
+     Comments 1146. Network Working Group, 04/1990.
+
+  ·  V. Jacobson, R. Braden, D. Borman. _T_C_P _E_x_t_e_n_s_i_o_n_s _f_o_r _H_i_g_h
+     _P_e_r_f_o_r_m_a_n_c_e, Request for Comments 1323. Network Working Group,
+     05/1992.
+  ·  T. Connolly, P. Amer, P. Conrad. _A_n _E_x_t_e_n_s_i_o_n _t_o _T_C_P _: _P_a_r_t_i_a_l
+     _O_r_d_e_r _S_e_r_v_i_c_e, Request for Comments 1693. Network Working Group,
+     11/1994.
+
+  ·  "Fyodor". _R_e_m_o_t_e _O_S _d_e_t_e_c_t_i_o_n _v_i_a _T_C_P_/_I_P _S_t_a_c_k _F_i_n_g_e_r_P_r_i_n_t_i_n_g,
+     Phrack Magazine Volume 8, Issue 54, 12/1998.
+
+  ·  R. Russel. _L_i_n_u_x _n_e_t_f_i_l_t_e_r _H_a_c_k_i_n_g _H_O_W_T_O, Linux Documentation
+     Project, 05/2000.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

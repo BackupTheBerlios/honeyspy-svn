@@ -1,0 +1,300 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="SGML-Tools 1.0.9">
+ <TITLE>IP Personality: Pseudo Code</TITLE>
+ <LINK HREF="ippersonality-en-7.html" REL=next>
+ <LINK HREF="ippersonality-en-5.html" REL=previous>
+ <LINK HREF="ippersonality-en.html#toc6" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="ippersonality-en-7.html">Next</A>
+<A HREF="ippersonality-en-5.html">Previous</A>
+<A HREF="ippersonality-en.html#toc6">Contents</A>
+<HR>
+<H2><A NAME="s6">6. Pseudo Code</A></H2>
+
+<H2><A NAME="ss6.1">6.1 Overview</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>
+<P>We implement a simple virtual machine in the kernel module. This
+machine runs over a TCP packet and handles an internal state, composed of:
+<P>
+<UL>
+<LI>
+An instruction pointer in the code.</LI>
+<LI>
+A TCP Options buffer.</LI>
+<LI>
+Several "registers":
+<EM>flags</EM>, <EM>mss</EM>, <EM>wscale</EM>, <EM>win</EM>,
+<EM>ack</EM> and <EM>df</EM>
+
+
+corresponding to TCP header fields of the same name for a
+potential reply packet.</LI>
+</UL>
+<P>
+<P>
+<P>
+<P>
+<P>The code understood by the virtual machine is made of intruction
+on 32 bits (in the machine's endian) composed of a mnemonic (8
+bits), an option (4 bits) and an operand (20 bits), like below:
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+0              7 8     11 12                                    31
++---------------+--------+---------------------------------------+
+|    Mnemonic   | Option |              Operand                  |
++---------------+--------+---------------------------------------+
+</PRE>
+</CODE></BLOCKQUOTE>
+<P>
+<H2><A NAME="ss6.2">6.2 Instructions</A>
+</H2>
+
+<P>
+<P>
+<H3>TEST</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 01
+<P>
+<P>
+<P>
+<P>
+<P>Test the object defined by the option. If the test is true, the
+instruction pointer goes from instruction <EM>i</EM> to instruction
+<EM>i+2</EM>. If the test is false, the program continues at
+instruction <EM>i+1</EM>.
+<P>
+<P>The test options available are the following:
+<P>
+<UL>
+<LI><EM>TCP Option</EM> (0)
+
+
+
+: True if the passed TCP option in the operand is present in the
+original packet.</LI>
+<LI><EM>Any TCP Flags</EM> (1)
+
+
+
+: True if one of the TCP flags passed in the operand are enabled
+in the original packet.</LI>
+<LI><EM>All TCP Flags</EM> (2)
+
+
+
+: True if all the TCP flags passed in the operand are enabled
+in the original packet.</LI>
+<LI><EM>Ack</EM> (3)
+
+
+
+: True if the original packet ACK value is equal to the operand.</LI>
+<LI><EM>Listen</EM> (4)
+
+
+
+: True if the destination port of the original packet is listening locally.</LI>
+</UL>
+<P>
+<H3>JMP</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 02
+<P>
+<P>
+<P>Program continues running at the instruction which address is the operand.
+<P>
+<H3>PUT</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 03
+<P>
+<P>
+<P>
+<P>Adds a TCP option in the TCP options buffer. The inserted TCP
+option is in the operand and its source is determined by the
+instruction option.
+<P>
+<P>The following options are available:
+<P>
+<UL>
+<LI><EM>Copy</EM> (0)
+
+
+
+: The inserted TCP option is copied from the original packet if found.</LI>
+<LI><EM>Insert</EM> (1)
+
+
+
+
+: The inserted TCP option is copied from the internal
+registers. This is only possible for the <EM>mss</EM>,
+<EM>wscale</EM> and <EM>timestamp</EM> options.</LI>
+</UL>
+<P>
+<H3>SET</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 04
+<P>
+<P>
+<P>
+<P>Sets the value of an internal register in the virtual machine. The
+register and the type of operation are determined by the option. The
+value is in the operand.
+<P>
+<P>The following options are available:
+<P>
+<UL>
+<LI><EM>flags</EM> (0)
+
+
+
+: Sets the <EM>flag</EM> registers to the operand value.</LI>
+<LI><EM>ack</EM> (1)
+
+
+
+: Sets the <EM>ack</EM> registers to the operand value.</LI>
+<LI><EM>df</EM> (2)
+
+
+
+: Sets the <EM>df</EM> ("Don't Fragment") registers to the operand value.</LI>
+<LI><EM>win</EM> (3)
+
+
+
+: Sets the <EM>win</EM> registers to the operand value.</LI>
+<LI><EM>mss</EM> (4)
+
+
+
+: Sets the <EM>mss</EM> registers to the operand value.</LI>
+<LI><EM>wscale</EM> (5)
+
+
+
+: Sets the <EM>wscale</EM> registers to the operand value.</LI>
+<LI><EM>timestamp</EM> (6)
+
+
+: Sets the <EM>timestamp</EM> (local timestamp value) register to
+the operand value.</LI>
+<LI><EM>relative ack</EM> (9)
+
+
+
+
+: Sets the <EM>ack</EM> registers to the operand value added to
+the original packet value.</LI>
+<LI><EM>relative df</EM> (10)
+
+
+
+
+: Sets the <EM>df</EM> ("Don't Fragment") registers to the operand value added to
+the original packet value.</LI>
+<LI><EM>relative win</EM> (11)
+
+
+
+
+: Sets the <EM>win</EM> registers to the operand value added to
+the original packet value.</LI>
+<LI><EM>relative mss</EM> (12)
+
+
+
+
+: Sets the <EM>mss</EM> registers to the operand value added to
+the original packet value.</LI>
+<LI><EM>relative wscale</EM> (13)
+
+
+
+
+: Sets the <EM>wscale</EM> registers to the operand value added to
+the original packet value.</LI>
+<LI><EM>relative timestamp</EM> (14)
+
+
+
+: Sets the <EM>timestamp</EM> (local timestamp value) register to
+the operand value added with the current usable value for the local
+timestamp.</LI>
+</UL>
+<P>
+<H3>RET</H3>
+
+<P>
+<P><B>Code&nbsp;:</B> 05
+<P>
+<P>Terminates the program execution and returns the operand.
+<P>
+<P>The available operands are:
+<P>
+<UL>
+<LI><EM>Accept</EM> (1)
+
+
+
+: Terminates execution and make the packet continue its path.</LI>
+<LI><EM>Drop</EM> (2)
+
+
+
+: Terminates execution and drop packet.</LI>
+<LI><EM>Reply</EM> (3)
+
+
+
+: Terminates execution, build a reply TCP packet from the virtual
+machine state and send it.</LI>
+</UL>
+<P>
+<H2><A NAME="ss6.3">6.3 TCP Options</A>
+</H2>
+
+<P>
+<P>
+<P>
+<P>For the various instructions that accept TCP options, the
+following TCP options are available:
+<P>
+<UL>
+<LI><EM>eol</EM> (0)</LI>
+<LI><EM>nop</EM> (1)</LI>
+<LI><EM>mss</EM> (2)</LI>
+<LI><EM>wscale</EM> (3)</LI>
+<LI><EM>sackOK</EM> (4)</LI>
+<LI><EM>sack</EM> (5)</LI>
+<LI><EM>echo</EM> (6)</LI>
+<LI><EM>echoreply</EM> (7)</LI>
+<LI><EM>timestamp</EM> (8)</LI>
+<LI><EM>pocOK</EM> (9)</LI>
+<LI><EM>pocSP</EM> (10)</LI>
+<LI><EM>CC</EM> (11)</LI>
+<LI><EM>CC.NEW</EM> (12)</LI>
+<LI><EM>CC.ECHO</EM> (13)</LI>
+<LI><EM>acreq</EM> (14)</LI>
+<LI><EM>acdata</EM> (15)</LI>
+</UL>
+<P>
+<HR>
+<A HREF="ippersonality-en-7.html">Next</A>
+<A HREF="ippersonality-en-5.html">Previous</A>
+<A HREF="ippersonality-en.html#toc6">Contents</A>
+</BODY>
+</HTML>

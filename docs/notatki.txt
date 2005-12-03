@@ -1,4 +1,8 @@
 
+przy konfiguracji jadra z nasza modyfikacja laty ippersonality
+nalezy wylaczyc modul stealth
+
+
 
 czemu gdzie poza recvFromPeer pojawia siê u nas thaw jeszcze?
 
