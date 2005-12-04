@@ -5,3 +5,7 @@ interfejs webowy
 uslugi
 	open proxy
 
+trzeba to dodac:
+ebtables -t nat  -A POSTROUTING -p ipv4 --ip-src 192.168.66.100 -j snat --to-source 00:03:BA:01:02:03
+ DONE
+
