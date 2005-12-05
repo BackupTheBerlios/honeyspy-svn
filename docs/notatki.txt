@@ -1,4 +1,37 @@
 
+przyk³adowa konfiguracja moze byc taka:
+	brctl addbr honey
+	brctl addif honey eth0
+	ifconfig eth0 0
+	ifconfig honey 192.168.66.11
+	ifconfig honey up
+	route add -net 192.168.0.0/16 dev honey
+	route add -net 0/0 gateway 192.168.6.1 dev honey
+
+	uruchamiany p0f POC w jednym oknie
+	uruchamiamy ./main -m -c master.conf jako root
+	uruchamiamy ./console 127.0.0.1 9000 w  trzecim oknie
+	dodajemy ip aliasy
+		addIPAlias 192.168.66.99
+		addIPAlias 192.168.66.100
+		addIPAlias 192.168.66.101
+	ustawiamy fingerprinty
+		setFingerprint 192.168.66.99,tru64_v5
+		setFingerprint 192.168.66.100,solaris8
+		setFingerprint 192.168.66.101,freebsd 
+	ustawiamy adresy MAC:
+		setMAC 192.168.66.99,00:0B:CD:BA:CA:DA
+		setMAC 192.168.66.100,00:14:4F:BA:AA:AD
+		setMAC 192.168.66.101,00:0A:28:01:02:03
+	dodajemy us³ugi:
+		addService 192.168.66.99,tcp,25,services/smtp
+		addService 192.168.66.100,tcp,79,services/smtp
+		addService 192.168.66.100,tcp,80,services/openproxy
+		addService 192.168.66.101,tcp,110,services/pop3
+
+
+
+
 przy konfiguracji jadra z nasza modyfikacja laty ippersonality
 nalezy wylaczyc modul stealth
 
