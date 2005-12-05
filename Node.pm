@@ -18,6 +18,7 @@ use POSIX qw(setsid);
 use Carp;
 use Master;
 use Socket;
+use IPC::Open2;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -77,6 +78,8 @@ sub new {
 
 		# falszowane charakterystyki stosu tcp/ip (ip -> os)
 		'fingerprints' => {},
+		'p0f_pid' => undef,
+		'p0f_fh' => undef,
 
 		# Handlery dla zdarzen na uchwytach plikow
 		'r_handlers' => {},
@@ -747,6 +750,42 @@ sub enablePcap {
 }
 
 
+
+############################################################
+# Pasywne rozpoznawanie zdalnego systemu operacyjnego (p0f)
+#
+sub enableP0f {
+	my ($self) = @_;
+	$logger->info('Enabling p0f...');
+
+	$SIG{CHLD} = 'IGNORE';
+
+	my ($rdfh, $wrfh);
+	eval {
+		my $pid = open2($rdfh, $wrfh, 'exec p0f -q -l -p 2>&1');
+		$self->{'p0f_pid'} = $pid;
+		$self->{'p0f_fh'} = $rdfh;
+		$self->{'r_set'}->add($rdfh);
+		$self->{'r_handlers'}{$rdfh} = sub {
+			$logger->info("OS recognized: " . <$rdfh>);
+		};
+	};
+	for ($@) {
+		if (/^open2:/) {
+			my $msg = 'Couldn\'t start p0f';
+			$logger->error($msg);
+			return $msg;
+		}
+	}
+}
+
+sub disableP0f {
+	my ($self) = @_;
+	$logger->info('Disabling p0f...');
+
+	CORE::kill 9, $self->{'p0f_pid'}
+		if defined $self->{'p0f_pid'};
+}
 
 
 
