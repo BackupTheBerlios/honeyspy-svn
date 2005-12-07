@@ -13,6 +13,7 @@ import sys
 log in with username "user" and password "password".
 """
 
+
 class ExampleAvatar(avatar.ConchUser):
 
     def __init__(self, username):
@@ -87,6 +88,13 @@ class ExampleSession:
 from twisted.python import components
 components.registerAdapter(ExampleSession, ExampleAvatar, session.ISession)
 
+from twisted.conch.ssh.transport import SSHServerTransport, SSHTransportBase;
+
+class mySSHServerTransport(SSHServerTransport):
+    def __init__(self):
+        self.ourVersionString = 'SSH-1.99-OpenSSH_3.8.1p1 Debian-8.sarge.4'
+        return
+
 class ExampleFactory(factory.SSHFactory):
     publicKeys = {
         'ssh-rsa': keys.getPublicKeyString(data=publicKey)
@@ -98,6 +106,16 @@ class ExampleFactory(factory.SSHFactory):
         'ssh-userauth': userauth.SSHUserAuthServer,
         'ssh-connection': connection.SSHConnection
     }
+    def buildProtocol(self, addr):
+        t = mySSHServerTransport()
+        t.supportedPublicKeys = self.privateKeys.keys()
+        if not self.primes:
+            ske = t.supportedKeyExchanges[:]
+            ske.remove('diffie-hellman-group-exchange-sha1')
+            t.supportedKeyExchanges = ske
+        t.factory = self
+        return t
+
     
 
 portal = portal.Portal(ExampleRealm())
@@ -108,6 +126,8 @@ portal.registerChecker(InMemoryPublicKeyChecker())
 ExampleFactory.portal = portal
 
 if __name__ == '__main__':
+
+    from twisted.conch.ssh import transport;
 
     from twisted.internet import stdio;
     factory = ExampleFactory();

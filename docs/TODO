@@ -1,9 +1,13 @@
+zintegrowaæ p0f [zrobiê, mam obmy¶lone]
+interfejs webowy [raczej du¿a rzecz, w Template::Toolkit powinni¶my]
+zrobiæ przesy³anie logów [mam wstêpny pomys³]
+zrobiæ wspólny interfejs do logowania zdarzeñ z poziomu na przyk³ad us³ug
+uslugi
+	ssh
+	rozbudowaæ us³ugi [przyjemne, proste]
+
 Fingerprint
 	skompilowac jadro na laptopie z ippersonality
-p0f
-interfejs webowy
-uslugi
-	open proxy
 
 trzeba to dodac:
 ebtables -t nat  -A POSTROUTING -p ipv4 --ip-src 192.168.66.100 -j snat --to-source 00:03:BA:01:02:03
