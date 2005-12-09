@@ -92,7 +92,6 @@ sub write {
 	};
 
 	$self->{'master'}->_removefh($self->{'socket'}, 'w');
-#	$self->{'master'}->remove_sensor($self);
 }
 
 
@@ -121,12 +120,6 @@ sub DESTROY {
 	$logger->debug("Destruktor Sensora ${\($_[0]->{'name'})}\n");
 }
 
-
-#
-# XXX
-# sendToPeer i recvFromPeer powinny w zasadzie nie byæ
-# metodami statycznymi
-#
 
 sub sendToPeer {
 	my ($self) = shift;

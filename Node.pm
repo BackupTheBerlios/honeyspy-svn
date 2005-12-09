@@ -132,10 +132,12 @@ sub _checkAbilities {
 	$self->{'abilities'}{'ipaliases'} = 1 if ! $>;
 
 	# p0f
-	eval {
-		require Net::P0f;
-	};
-	$self->{'abilities'}{'p0f'} = 1 if ! $@;
+	foreach (split(/:/, $ENV{'PATH'})) {
+		if (-x "$_/p0f") {
+			$self->{'abilities'}{'p0f'} = 1;
+			last;
+		}
+	}
 
 	# fingerprint
 	$self->{'abilities'}{'fingerprint'} = 1 if ! $>;
