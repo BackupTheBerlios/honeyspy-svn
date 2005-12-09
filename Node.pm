@@ -63,7 +63,8 @@ sub new {
 			'pcap' => undef,        # nasluchiwanie pakietow
 		},
 		'interfaces' => [],
-		'ports' => [],
+		'ports' => {},             # dzialajace uslugi
+											# "addr/proto/port" -> filehandle
 
 		# Interfejs nasluchiwania (PCAP)
 		'pcap' => undef,
@@ -809,6 +810,8 @@ sub addService {
 		return $msg;
 	}
 
+	$self->{'ports'}{"$addr/$proto/$port"} = $socket;
+
 	$self->_addfh($socket, 'r');
 	$self->{'r_handlers'}{$socket} = sub {
 		my $client = $socket->accept();
@@ -835,7 +838,18 @@ sub addService {
 
 sub delService {
 	my ($self, $addr, $proto, $port) = @_;
+	if (! exists $self->{'ports'}{"$addr/$proto/$port"}) {
+		my $msg = "No service is bound there";
+		$logger->warn($msg);
+		return $msg;
+	}
+
 	$logger->info("Removing service from $addr:$port ($proto)");
+	my $fh = $self->{'ports'}{"$addr/$proto/$port"};
+	$self->_removefh($fh);
+	$fh->close();
+	delete $self->{'ports'}{"$addr/$proto/$port"};
+	return 0;
 }
 
 
@@ -980,3 +994,4 @@ sub runOnNode {
 
 1;
 
+# vim: set tw=3 sw=3 ft=perl:

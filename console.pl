@@ -8,6 +8,36 @@ use Term::ReadLine;
 use Log::Log4perl (':easy');
 Log::Log4perl->easy_init($DEBUG);
 
+use constant HISTORY_FILE => "$ENV{HOME}/.honeyspy_history";
+use constant COMPLETION_LIST => [qw/
+	getName
+	getAbilities
+	runOnNode
+	getSensors
+	kill
+
+	addService
+	delService
+
+	getAvailableFingerprints
+	setFingerprint
+	delFingerprint
+
+	setMAC
+	getMAC
+	delMAC
+
+	enableP0f
+	disableP0f
+
+	enablePcap
+	addFilter
+	replaceFilters
+	delFilter
+	getFilter
+/];
+
+
 if ($#ARGV != 1) {
 	print "Usage:\n\t$0 <host> <port>\n";
 	exit 1;
@@ -41,24 +71,33 @@ print "\nConnection established\n";
 
 my $prompt = '> ';
 my $term = new Term::ReadLine 'HoneySpy console';
+my $rl_attribs = $term->Attribs;
+$rl_attribs->{'completion_entry_function'} = 
+	$rl_attribs->{'list_completion_function'};
+$rl_attribs->{'completion_word'} = COMPLETION_LIST;
+$term->read_history(HISTORY_FILE)
+ if -r HISTORY_FILE;
+
 
 my $s = new Sensor({
 	name => 'main',
 	socket => $master,
 });
 
+
 print $prompt;
 while (defined($_ = $term->readline($prompt))) {
 	$term->addhistory($_) if /\S/;
 	next unless ($_);
-	my ($cmd, $args, @args) = ($_);
-	if (/^(.*?)\s(.*)/) {
-		($cmd, @args) = ($1, split(/\s*,\s*/, $2));
-	}
+
+	my ($cmd, @args) = split(/\s+/);
 
 	$s->sendToPeer($cmd, 1, @args);
 	my @res = $s->recvFromPeer();
 
 	print $prompt;
 }
+
+system("touch " . HISTORY_FILE);
+$term->append_history(100, HISTORY_FILE);
 
