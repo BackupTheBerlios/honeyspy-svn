@@ -149,9 +149,8 @@ sub recvFromPeer {
 			return;
 		}
 	}
-	$logger->debug("Odpowiedz sensora:\n");
-	local $" = "\n->";
-	$logger->debug("@resp\n");
+	local $" = "\n   -> ";
+	$logger->debug("Sensor response:\n   -> @resp\n");
 	return @resp;
 }
 

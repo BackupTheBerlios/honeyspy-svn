@@ -19,6 +19,9 @@ use constant COMPLETION_LIST => [qw/
 	addService
 	delService
 
+	addIPAlias
+	delIPAlias
+
 	getAvailableFingerprints
 	setFingerprint
 	delFingerprint
