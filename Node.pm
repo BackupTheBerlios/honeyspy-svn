@@ -962,6 +962,7 @@ sub process_command {
 
 		$self->_addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
+			unshift(@result, 'ret');
 			sendDataToSocket($sock, @result);
 			$self->_removefh($sock, 'w');
 		};
@@ -986,11 +987,22 @@ sub runOnNode {
 		unless exists($self->{'sensors'}{$name});
 
 	my $sensor = $self->{'sensors'}{$name};
+	my $socket = $sensor->{'socket'};
+
+#	$self->_addfh($socket, 'w');
+#	$self->{'w_handlers'}{$socket} = sub {
+
 	$sensor->call($function, wantarray, @args);
+
+#	};
+
 #	$sensor->sendToPeer($function, wantarray, @args);
 
-	# XXX tu by sie przydalo poprawic asynchronicznosc
-	return $sensor->recvFromPeer();
+	# XXX
+	# tu by sie przydalo poprawic asynchronicznosc
+	# ale byloby to bardzo trudne
+	# 
+	return $sensor->read('return_code');
 }
 
 

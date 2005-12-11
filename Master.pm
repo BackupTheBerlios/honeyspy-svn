@@ -150,14 +150,14 @@ sub accept_client {
 	$self->{'sensors'}{$client_name} = $sensor;
 	$self->{'sensors'}{$socket} = $sensor;
 
-	$self->{'w_handlers'}{$socket} = sub {
-		$sensor->write();
-	};
+#	$self->{'w_handlers'}{$socket} = sub {
+#		$sensor->write();
+#	};
 	$self->{'r_handlers'}{$socket} = sub {
 		$sensor->read();
 	};
-	$logger->debug("Added $socket to select sets");
-	$self->_addfh($socket, 'rw');
+	$logger->debug("Added $socket to select set");
+	$self->_addfh($socket, 'r');
 }
 
 

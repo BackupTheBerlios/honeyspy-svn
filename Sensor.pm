@@ -63,36 +63,50 @@ sub getName() {
 # Czyta komunikat od sensora (sa dane)
 #
 sub read {
-	my ($self) = @_;
+	my ($self, $what) = @_;
 	my ($sock) = $self->{'socket'};
 	$logger->debug("Reading data from sensor");
 
-	if ($sock->peek(undef, 1) == 0) {
-		$logger->info("Sensor closed connection");
-		$self->{'master'}->remove_sensor($self);
-		return 0
-	}
-	return 1;
+	do {
+		if ($sock->peek(undef, 1) == 0) {
+			$logger->info("Sensor closed connection");
+			$self->{'master'}->remove_sensor($self);
+			return -1;
+		}
+
+		my ($type, @data) = $self->recvFromPeer();
+		if ($type eq 'ret') {
+			return @data;
+		}
+		elsif ($type eq 'log') {
+			$logger->info(@data);
+		}
+		else {
+			$logger->fatal("It shouldn't happen. Broken protocol! :(");
+			return -2;
+		}
+	} while ($what && $what eq 'return_code');
 }
 
 #
 # Pisze dane do sensora (gniazdo gotowe)
+# XXX istotnie nie uzywamy juz tego
 #
 sub write {
 	my ($self) = @_;
 	my ($sock) = $self->{'socket'};
 	$logger->debug("Writing data to sensor");
 
-	$self->sendToPeer('info', 0);
-	$self->{'master'}{'r_handlers'}{$sock} = sub {
-		if ($self->read) {
-			my $res = $self->recvFromPeer();
-			$logger->info("Sensor replied: $res");
-			$self->{'master'}->_removefh($sock, 'w');
-		}
-	};
+#	$self->sendToPeer('info', 0);
+#	$self->{'master'}{'r_handlers'}{$sock} = sub {
+#		if ($self->read) {
+#			my $res = $self->recvFromPeer();
+#			$logger->info("Sensor replied: $res");
+#			$self->{'master'}->_removefh($sock, 'w');
+#		}
+#	};
 
-	$self->{'master'}->_removefh($self->{'socket'});
+	$self->{'master'}->_removefh($self->{'socket'}, 'w');
 }
 
 
@@ -108,12 +122,13 @@ sub AUTOLOAD {
 #
 sub call {
 	my ($self, $name, $arrayctx, @args) = @_;
-	my $sensor = $self->{name};
+	my $sensor = $self->{'name'};
 	local $" = ',';
 	$logger->debug("I'm running function $name(@args) on $sensor sensor in "
 		. ($arrayctx ? 'list' : 'scalar') . " context\n");
 
 	$self->sendToPeer($name, $arrayctx, @args);
+	$self->{'master'}->_removefh($self->{'socket'}, 'w');
 	$self->{'command_in_progress'} = 1;
 }
 
@@ -148,7 +163,7 @@ sub recvFromPeer {
 		}
 	}
 	local $" = "\n   -> ";
-	$logger->debug("Sensor response:\n   -> @resp\n");
+	$logger->debug("Received data from Sensor:\n   -> @resp\n");
 	return @resp;
 }
 

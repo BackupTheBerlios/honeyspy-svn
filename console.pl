@@ -6,7 +6,7 @@ use Sensor;
 use IO::Socket::SSL;
 use Term::ReadLine;
 use Log::Log4perl (':easy');
-Log::Log4perl->easy_init($DEBUG);
+Log::Log4perl->easy_init($WARN);
 
 use constant HISTORY_FILE => "$ENV{HOME}/.honeyspy_history";
 use constant COMPLETION_LIST => [qw/
@@ -98,6 +98,9 @@ while (defined($_ = $term->readline($prompt))) {
 
 	$s->sendToPeer($cmd, 1, @args);
 	my @res = $s->recvFromPeer();
+
+	local $" = "\n   -> ";
+	print "@res\n";
 
 	print $prompt;
 }
