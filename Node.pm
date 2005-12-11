@@ -5,6 +5,7 @@ package Node;
 use strict;
 use IO::Select;
 use Log::Log4perl (':easy');
+use MasterAppender;
 use Storable qw(nstore_fd freeze);
 use IO::Socket::SSL; # qw(debug4);
 use IO::Socket::INET;
@@ -54,6 +55,7 @@ sub new {
 		'name' => 'unnamed',
 		'socket' => \*STDOUT,
 		'mode' => 'sensor',
+		'appender' => undef,
 
 		# Atrybuty dzialania serwera
 		'abilities' => {
@@ -365,6 +367,17 @@ sub _configure_master_connection {
 
 	$self->{'connected'} = 1;
 	$self->{'master_sock'} = $master;
+
+	my $appender = Log::Log4perl::Appender->new(
+		"MasterAppender",
+		name => 'honeyspy',
+		socket => $self->{'master_sock'}
+	);
+
+	my $layout = Log::Log4perl::Layout::PatternLayout->new("[%r] %F %L %m%n");
+	$appender->layout($layout);
+	$logger->add_appender($appender);
+	$self->{'appender'} = $appender;
 }
 
 
@@ -935,6 +948,7 @@ sub process_command {
 		$logger->debug("My master closed connection.");
 		$self->_removefh($sock, 're');
 		$self->{'connected'} = 0;
+		$logger->remove_appender($self->{'appender'});
 		close($sock);
 	}
 	else {

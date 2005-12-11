@@ -7,7 +7,14 @@ use Getopt::Long;
 use Master;
 use Node;
 
-Log::Log4perl->easy_init($DEBUG);
+#Log::Log4perl->easy_init($DEBUG);
+
+Log::Log4perl::init( \q[
+	log4perl.rootLogger=DEBUG, STDIO
+
+	log4perl.appender.STDIO=Log::Log4perl::Appender::Screen
+	log4perl.appender.STDIO.layout=SimpleLayout
+]);
 
 my($master_mode, $config);
 
