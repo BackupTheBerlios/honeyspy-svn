@@ -116,7 +116,7 @@ sub new {
 ################################################################################
 
 #
-# XXX Do polepszenia (jest wstepna prosta wersja)
+# XXX Mozna polepszyc to sprawdzanie (jest wstepna prosta wersja)
 #
 sub _checkAbilities {
 	my ($self) = @_;
@@ -869,17 +869,17 @@ sub run {
 
 	# XXX
 	# Brak mozliwosc polaczenia nie powinien tu chyba blokowac pracy wezla
-	if ($self->{'mode'} eq 'sensor') {
-		$SIG{INT} = sub {
-			$logger->info("Caught SIGINT, dying.");
-			exit(0);
-		};
-		while (!($self->_connect_to_master())) {
-			my $delay = $self->{'reconnect'};
-			$logger->info("Retrying in $delay seconds");
-			select(undef, undef, undef, $delay);
-		}
-	}
+#	if ($self->{'mode'} eq 'sensor') {
+#		$SIG{INT} = sub {
+#			$logger->info("Caught SIGINT, dying.");
+#			exit(0);
+#		};
+#		while (!($self->_connect_to_master())) {
+#			my $delay = $self->{'reconnect'};
+#			$logger->info("Retrying in $delay seconds");
+#			select(undef, undef, undef, $delay);
+#		}
+#	}
 
 	local $| = 1;
 
@@ -900,7 +900,7 @@ sub run {
 			$logger->debug("Timeout");
 			if ($self->{'mode'} eq 'sensor') {
 				if (! $self->{'connected'}) {
-					$logger->debug("Trying to reconnect to my master");
+					$logger->debug("Trying to (re)connect to my master");
 					$self->_connect_to_master();
 				}
 			}
@@ -985,9 +985,9 @@ sub runOnNode {
 	return "No such node: $name"
 		unless exists($self->{'sensors'}{$name});
 
-#	my $socket = $self->{'sensors'}{$name}{'socket'};
 	my $sensor = $self->{'sensors'}{$name};
-	$sensor->sendToPeer($function, wantarray, @args);
+	$sensor->call($function, wantarray, @args);
+#	$sensor->sendToPeer($function, wantarray, @args);
 
 	# XXX tu by sie przydalo poprawic asynchronicznosc
 	return $sensor->recvFromPeer();

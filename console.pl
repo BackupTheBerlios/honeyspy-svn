@@ -21,6 +21,7 @@ use constant COMPLETION_LIST => [qw/
 
 	addIPAlias
 	delIPAlias
+	getIPAlias
 
 	getAvailableFingerprints
 	setFingerprint

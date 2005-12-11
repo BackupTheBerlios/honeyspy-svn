@@ -29,6 +29,7 @@ sub new($) {
 		'name' => undef,
 		'socket' => undef,
 		'master' => undef,
+		'command_in_progress' => 0,
 	};
 
 
@@ -91,12 +92,12 @@ sub write {
 		}
 	};
 
-	$self->{'master'}->_removefh($self->{'socket'}, 'w');
+	$self->{'master'}->_removefh($self->{'socket'});
 }
 
 
 sub AUTOLOAD {
-	$logger->debug("Powinienem sprobowac wywolac zdalnie $AUTOLOAD:\n");
+	$logger->debug("I should try tu ron $AUTOLOAD via RPC:\n");
 	shift->call($AUTOLOAD, wantarray, @_);
 }
 
@@ -109,11 +110,11 @@ sub call {
 	my ($self, $name, $arrayctx, @args) = @_;
 	my $sensor = $self->{name};
 	local $" = ',';
-	$logger->debug("Wywo³ujê zdalnie na sensorze $sensor funkcje $name(@args) w kontekscie "
-		. ($arrayctx ? 'listowym' : 'skalarnym') . "\n");
+	$logger->debug("I'm running function $name(@args) on $sensor sensor in "
+		. ($arrayctx ? 'list' : 'scalar') . " context\n");
 
 	$self->sendToPeer($name, $arrayctx, @args);
-#	sendToPeer($self->{socket}, $name, $arrayctx, @args);
+	$self->{'command_in_progress'} = 1;
 }
 
 sub DESTROY {
@@ -126,9 +127,6 @@ sub sendToPeer {
 	my $sock = $self->{'socket'};
 
 	return Node::sendDataToSocket($sock, @_);
-
-#	print $sock pack('N', length($serialized));
-#	print $sock $serialized;
 }
 
 sub recvFromPeer {
