@@ -12,15 +12,8 @@ sub new {
 	bless $self, $class;
 }
 
-#sub name {
-#	return 'honeyspy';
-#}
-
 sub log {
 	my ($self, @data) = @_;
-
-#	local $" = "|";
-#	print "Logujê -> @data\n";
 
 	Node::sendDataToSocket($self->{'socket'}, 'log', @data);
 }

@@ -402,7 +402,7 @@ sub _connect_to_master {
    my ($self) = @_;
 	my $master;
 
-	$logger->debug("Connecting to 127.0.0.1:9000...");
+	$logger->debug("Connecting to $self->{'master_addr'}:$self->{'master_port'}...");
 	$master = IO::Socket::SSL->new(
 		PeerAddr => $self->{'master_addr'},
 		PeerPort => $self->{'master_port'},
@@ -421,7 +421,7 @@ sub _connect_to_master {
 	}
 	my ($subject_name, $issuer_name, $cipher, $trusted_master);
 	$trusted_master = 0;
-	if( ref($master) eq "IO::Socket::SSL") {
+	if(ref($master) eq "IO::Socket::SSL") {
 		$subject_name = $master->peer_certificate("subject");
 		$issuer_name = $master->peer_certificate("issuer");
 		$cipher = $master->get_cipher();

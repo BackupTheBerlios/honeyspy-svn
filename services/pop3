@@ -3,17 +3,13 @@ use strict;
 use Switch;
 
 my $komeda;
-my $user=0;
-
+my $user = 0;
 $| = 1;
 
-print "+OK POP3 Ready poczta.o2.pl\n";
+print "+OK POP3 Ready localhost\n";
 
-while(1)
-{
-	$komeda = <STDIN>;
+while(defined($komeda = <STDIN>)) {
 	chop $komeda;
-
 
 	switch($komeda){
 		case /^USER /{
