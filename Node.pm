@@ -1,4 +1,21 @@
 #!/usr/bin/perl -T
+# HoneySpy -- advanced honeypot environment
+# Copyright (C) 2005  Robert Nowotniak
+# Copyright (C) 2005  Michal Wysokinski
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 package Node;
 
@@ -314,7 +331,7 @@ sub _pcapPacket {
 	$msg .= ' tos:' . $ip_obj->{'tos'};
 	$msg .= ' len:' . $ip_obj->{'len'};
 	$msg .= ' id:' . $ip_obj->{'id'};
-	$msg .= ' proto:' . $ip_obj->{'proto'};
+	$msg .= ' proto:' . getprotobynumber($ip_obj->{'proto'});
 	$msg .= ' flags:' . $ip_obj->{'flags'};
 
 	if ($ip_obj->{'proto'} == getprotobyname('tcp')) {
@@ -369,12 +386,12 @@ sub _configure_master_connection {
 	$self->{'master_sock'} = $master;
 
 	my $appender = Log::Log4perl::Appender->new(
-		"MasterAppender",
-		name => 'honeyspy',
+		'MasterAppender',
+		name => 'MasterAppender',
 		socket => $self->{'master_sock'}
 	);
 
-	my $layout = Log::Log4perl::Layout::PatternLayout->new("[%r] %F %L %m%n");
+	my $layout = Log::Log4perl::Layout::PatternLayout->new("%m%n");
 	$appender->layout($layout);
 	$logger->add_appender($appender);
 	$self->{'appender'} = $appender;
@@ -520,7 +537,9 @@ sub getSensors() {
 }
 
 sub info {
-	$logger->debug("Jestem wezel ${\($_[0]->{name})}\n");
+	my $msg = "I'm ${\($_[0]->{name})} node";
+	$logger->debug($msg);
+	return $msg;
 }
 
 sub kill {
@@ -879,22 +898,11 @@ sub run {
 	my $self = shift;
 	$logger->info("Starting node " . $self->{'name'});
 
-
-	# XXX
-	# Brak mozliwosc polaczenia nie powinien tu chyba blokowac pracy wezla
-#	if ($self->{'mode'} eq 'sensor') {
-#		$SIG{INT} = sub {
-#			$logger->info("Caught SIGINT, dying.");
-#			exit(0);
-#		};
-#		while (!($self->_connect_to_master())) {
-#			my $delay = $self->{'reconnect'};
-#			$logger->info("Retrying in $delay seconds");
-#			select(undef, undef, undef, $delay);
-#		}
-#	}
-
 	local $| = 1;
+
+	$SIG{'PIPE'} = sub {
+		$logger->warn('Broken pipe');
+	};
 
 	$logger->debug("Entering main loop - node " . $self->{'name'});
 	for (;;) {
@@ -942,16 +950,18 @@ sub run {
 #
 sub process_command {
 	my ($self, $sock) = @_;
-	$logger->debug("Processing data from server.");
 
 	if ($sock->peek(undef, 1) == 0) {
+		Log::Log4perl->eradicate_appender('MasterAppender');
+		$self->{'appender'} = undef;
 		$logger->debug("My master closed connection.");
 		$self->_removefh($sock, 're');
 		$self->{'connected'} = 0;
-		$logger->remove_appender($self->{'appender'});
 		close($sock);
 	}
 	else {
+		$logger->debug("Processing data from server.");
+
 		my $buf;
 		sysread($sock, $buf, 4);
 		my $len = unpack('N', $buf);
@@ -1016,7 +1026,9 @@ sub runOnNode {
 	# tu by sie przydalo poprawic asynchronicznosc
 	# ale byloby to bardzo trudne
 	# 
-	return $sensor->read('return_code');
+	my @ret = $sensor->read('return_code');
+	$sensor->{'command_in_progress'} = 0;
+	return @ret;
 }
 
 

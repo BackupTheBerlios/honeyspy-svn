@@ -16,28 +16,30 @@ while(1)
 
 
 	switch($komeda){
-		case /^USER /	{
+		case /^USER /{
 			print "+OK\n";
-			$user=1;
+			$user = 1;
 		}
-	
-		case /^PASS /    {
-			if( $user == 1){
-			  print "-ERR Invalid password or username\n";
-			}else{
-		  		print "-ERR give username first\n";
+
+		case /^PASS / {
+			if($user == 1) {
+				print "-ERR Invalid password or username\n";
+			}
+			else {
+				print "-ERR give username first\n";
 			}
 		}
-		case "QUIT"{
+		case "QUIT" {
 			print "+OK\n";
 			exit 0;
 		}
 		else {
-			if( $user==1 ){
-			   print "-ERR use PASS password\n";
-		   	}else{
-   			   print "-ERR use USER name\n";
-		        }
+			if($user == 1) {
+				print "-ERR use PASS password\n";
+			}
+			else {
+				print "-ERR use USER name\n";
+			}
 		}
 	}
 }

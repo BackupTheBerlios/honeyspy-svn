@@ -9,12 +9,8 @@ use Node;
 
 #Log::Log4perl->easy_init($DEBUG);
 
-Log::Log4perl::init( \q[
-	log4perl.rootLogger=DEBUG, STDIO
+Log::Log4perl::init('log4perl.conf');
 
-	log4perl.appender.STDIO=Log::Log4perl::Appender::Screen
-	log4perl.appender.STDIO.layout=SimpleLayout
-]);
 
 my($master_mode, $config);
 

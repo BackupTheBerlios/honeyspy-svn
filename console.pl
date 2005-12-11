@@ -97,7 +97,7 @@ while (defined($_ = $term->readline($prompt))) {
 	my ($cmd, @args) = split(/\s+/);
 
 	$s->sendToPeer($cmd, 1, @args);
-	my @res = $s->recvFromPeer();
+	my @res = $s->read('return_code');
 
 	local $" = "\n   -> ";
 	print "@res\n";

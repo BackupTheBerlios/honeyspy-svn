@@ -3,6 +3,7 @@
 package Sensor;
 
 use Log::Log4perl (':easy');
+use Log::Log4perl::Level;
 
 use Storable qw(freeze thaw);
 use Node;
@@ -79,7 +80,10 @@ sub read {
 			return @data;
 		}
 		elsif ($type eq 'log') {
-			$logger->info(@data);
+			my %data = @data;
+			$logger->log(
+				Log::Log4perl::Level::to_priority($data{'log4p_level'}),
+				"[$self->{'name'}] $data{'message'}");
 		}
 		else {
 			$logger->fatal("It shouldn't happen. Broken protocol! :(");
