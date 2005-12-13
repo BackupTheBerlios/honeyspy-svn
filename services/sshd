@@ -7,11 +7,24 @@ from twisted.internet import reactor, protocol, defer
 from twisted.python import log
 from zope.interface import implements
 import sys
+import re
 log.startLogging(sys.stderr)
 
 
+def loguj(co)
+    print <STDERR> co
+
 def SymulujPowloke(komeda):
-    data = "\r\n komeda niedlugo bedzie to zaimplementowane ale narazie nie jest :) \r\n"
+    loguj(komeda)
+    if re.match(' *ls',komeda):
+        data = '\r\n ls dziala\r\n'
+    elif re.match(' *wget',komeda):
+        data ='\r\n wget dziala \r\n'
+    elif re.match('^ *pwd',komeda):
+        data ='/tmp'
+    else:
+        data = '\r\ncommand not found \r\n'
+    data += '[/tmp]$ '
     return data;
 
 class ExampleAvatar(avatar.ConchUser):
@@ -34,11 +47,12 @@ class EchoProtocol(protocol.Protocol):
     def dataReceived(self, data):
         if data == '\r':
             data = SymulujPowloke(self.komeda)
+            self.komeda = ""
         elif data == '\x03': #^C
             self.transport.loseConnection()
             return
         else:
-             pass
+             self.komeda +=data
         self.transport.write(data)
 
 publicKey = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3/c9k2I/Az64fxjHf9imyRJbixtQhlH9lfNjUIx+4LmrJH5QNRsFporcHDKOTwTTYLh5KmRpslkYHRivcJSkbh/C+BR3utDS555mV'
