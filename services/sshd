@@ -18,8 +18,10 @@ def SymulujPowloke(komeda):
     loguj(komeda)
     if re.match(' *ls',komeda):
         data = '\r\n ls dziala\r\n'
+    elif re.match(' *wget^',komeda):
+        data ='\r\n tu wyswietl help do wget \r\n'
     elif re.match(' *wget',komeda):
-        data ='\r\n wget dziala \r\n'
+        data = '\r\nSegmentation fault\r\ncore dumped\r\n'
     elif re.match('^ *pwd',komeda):
         data ='/tmp'
     else:
