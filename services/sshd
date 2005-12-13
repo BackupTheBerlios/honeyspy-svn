@@ -45,12 +45,13 @@ class EchoProtocol(protocol.Protocol):
     """
     komeda = ""
     def dataReceived(self, data):
-        if data == '\r':
-            data = SymulujPowloke(self.komeda)
-            self.komeda = ""
-        elif data == '\x03': #^C
+        if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
+            self.transport.write('\r\n');
             self.transport.loseConnection()
             return
+        elif data == '\r':
+            data = SymulujPowloke(self.komeda)
+            self.komeda = ""
         else:
              self.komeda +=data
         self.transport.write(data)
