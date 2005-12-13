@@ -83,7 +83,8 @@ sub new {
 		},
 		'interfaces' => [],
 		'ports' => {},             # dzialajace uslugi
-											# "addr/proto/port" -> filehandle
+											# "addr/proto/port" ->
+											#	 {socket -> ..., script -> ..., args -> ...}
 
 		# Interfejs nasluchiwania (PCAP)
 		'pcap' => undef,
@@ -111,7 +112,7 @@ sub new {
 		'w_set' => new IO::Select(),
 		'e_set' => new IO::Select(),
 
-      'stimeout' => 5,
+      'stimeout' => 3,
       'reconnect' => 4, # tyle sekund miedzy reconnect
       'connected' => 0
 	};
@@ -504,7 +505,7 @@ sub readConfig {
 
 
 #
-# U¿ywane tylko do testów RPC
+# U¿ywane g³ównie do testów RPC
 #
 sub getAbilities {
 	my ($self) = @_;
@@ -844,7 +845,9 @@ sub addService {
 		return $msg;
 	}
 
-	$self->{'ports'}{"$addr/$proto/$port"} = $socket;
+	$self->{'ports'}{"$addr/$proto/$port"}{'socket'} = $socket;
+	$self->{'ports'}{"$addr/$proto/$port"}{'script'} = $script;
+	$self->{'ports'}{"$addr/$proto/$port"}{'args'} = join(' ', @args);
 
 	$self->_addfh($socket, 'r');
 	$self->{'r_handlers'}{$socket} = sub {
@@ -879,14 +882,37 @@ sub delService {
 	}
 
 	$logger->info("Removing service from $addr:$port ($proto)");
-	my $fh = $self->{'ports'}{"$addr/$proto/$port"};
+	my $fh = $self->{'ports'}{"$addr/$proto/$port"}{'socket'};
 	$self->_removefh($fh);
 	$fh->close();
 	delete $self->{'ports'}{"$addr/$proto/$port"};
 	return 0;
 }
 
+sub getService {
+	my ($self, $addr, $proto, $port) = @_;
 
+	if (defined $port) {
+		if (defined $self->{'ports'}{"$addr/$proto/$port"}) {
+			my $result;
+			$result = $self->{'ports'}{"$addr/$proto/$port"}{'script'};
+			$result .= ' ' . $self->{'ports'}{"$addr/$proto/$port"}{'args'}
+				if defined ($self->{'ports'}{"$addr/$proto/$port"}{'args'});
+			return $result;
+		}
+		return 0;
+	}
+
+	my %result;
+	foreach (keys %{$self->{'ports'}}) {
+		my $value;
+		$value = $self->{'ports'}{$_}{'script'};
+		$value .= ' ' . $self->{'ports'}{$_}{'args'}
+			if defined ($self->{'ports'}{$_}{'args'});
+		$result{$_} = $value;
+	}
+	return %result;
+}
 
 
 
@@ -899,10 +925,16 @@ sub run {
 	$logger->info("Starting node " . $self->{'name'});
 
 	local $| = 1;
-
 	$SIG{'PIPE'} = sub {
 		$logger->warn('Broken pipe');
 	};
+
+	if ($self->{'mode'} eq 'sensor') {
+		if (! $self->{'connected'}) {
+			$logger->debug("Trying to (re)connect to my master");
+			$self->_connect_to_master();
+		}
+	}
 
 	$logger->debug("Entering main loop - node " . $self->{'name'});
 	for (;;) {
