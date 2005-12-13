@@ -11,8 +11,8 @@ import re
 log.startLogging(sys.stderr)
 
 
-def loguj(co)
-    print <STDERR> co
+def loguj(co):
+    pass
 
 def SymulujPowloke(komeda):
     loguj(komeda)
