@@ -23,7 +23,7 @@ use strict;
 use IO::Select;
 use Log::Log4perl (':easy');
 use MasterAppender;
-use Storable qw(nstore_fd freeze);
+use Storable qw(nstore_fd freeze thaw);
 use IO::Socket::SSL; # qw(debug4);
 use IO::Socket::INET;
 use NetPacket::Ethernet qw(:strip);
@@ -31,12 +31,13 @@ use NetPacket::Ethernet;
 use NetPacket::IP;
 use NetPacket::TCP;
 use Net::Pcap;
-use Storable ('thaw');
 use POSIX qw(setsid);
 use Carp;
-use Master;
 use Socket;
 use IPC::Open2;
+
+use Master;
+use Commons;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -48,15 +49,6 @@ use constant CORRECT_CERT =>
 
 use constant FINGERPRINTS_DIR => "fingerprints/";
 
-
-#
-# sendDataToSocket - Metoda statyczna, wysy³a dane na $sock
-#
-sub sendDataToSocket {
-	my ($sock, $serialized) = (shift, freeze [@_]);
-	print $sock pack('N', length($serialized));
-	print $sock $serialized;
-}
 
 
 #
@@ -1019,7 +1011,7 @@ sub process_command {
 		$self->_addfh($sock, 'w');
 		$self->{'w_handlers'}{$sock} = sub {
 			unshift(@result, 'ret');
-			sendDataToSocket($sock, @result);
+			Commons::sendDataToSocket($sock, @result);
 			$self->_removefh($sock, 'w');
 		};
 

@@ -33,7 +33,7 @@ sub new {
 sub log {
 	my ($self, @data) = @_;
 
-	Node::sendDataToSocket($self->{'socket'}, 'log', @data);
+	Commons::sendDataToSocket($self->{'socket'}, 'log', @data);
 }
 
 

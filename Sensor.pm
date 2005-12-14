@@ -25,6 +25,7 @@ use Log::Log4perl::Level;
 
 use Storable qw(freeze thaw);
 use Node;
+use Commons;
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -163,7 +164,7 @@ sub sendToPeer {
 	my ($self) = shift;
 	my $sock = $self->{'socket'};
 
-	return Node::sendDataToSocket($sock, @_);
+	return Commons::sendDataToSocket($sock, @_);
 }
 
 sub recvFromPeer {
