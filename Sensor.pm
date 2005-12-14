@@ -69,11 +69,6 @@ sub info() {
 	$logger->debug("Jestem sensor ${\($_[0]->{name})}\n");
 }
 
-#
-# XXX
-# Akcesory i modifykatory powinny byæ robione automatycznie
-# [automatyczna modifikacja wpisów w przestrzeni nazw modu³u]
-#
 sub getName() {
 	return shift->{'name'};
 }

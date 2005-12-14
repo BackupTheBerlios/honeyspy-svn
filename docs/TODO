@@ -5,6 +5,24 @@ interfejs webowy [raczej du¿a rzecz, w Template::Toolkit powinni¶my]
 zrobiæ przesy³anie logów [mam wstêpny pomys³]
 zrobiæ wspólny interfejs do logowania zdarzeñ z poziomu na przyk³ad us³ug
 uslugi
-	ssh
 	rozbudowaæ us³ugi [przyjemne, proste]
+	ssh
+		musi byæ jaki¶ argument np -o, --os [zrobiæ za pomoc± getopt lub optparse]
+			ten argument ma okreslac jaki banner w ssh bedzie wyswietlany
+		argument -l [lub --locked] okre¶la czy mo¿na siê zalogowaæ na dowoln±
+			kombunacjê user/has³o
+		ma byæ jaki¶ hash w kodzie, który okre¶la dozwolone pary user->has³o
+			gdy nie uruchomiono z opcj± -l, to ten hash okre¶la jak siê mo¿na zalogowaæ
+			powinny to byæ na przyk³ad pary root/root test/test foo/bar oracle/oracle
+		powinno byæ co¶ w rodzaju hashu komenda -> string/funkcja
+			gdy zalogowany user wpisuje ,,komenda'', i temu kluczowi w hashu
+			odpowiada string, to nalezy mu go wypisaæ. Gdy temu kluczowi
+			odpowiada funkcja, to nale¿y j± wykonaæ i wypisac mu rezultat.
+			Mo¿e to s³u¿yæ to wypisania nieca³kiem sta³ych odpowiedzi na komendy.
+			na przyk³ad na komendê date móg³by siê pojawiaæ aktualny czas, a nie sta³y
+		z kodu powinna byæ wywalona mo¿liwo¶æ zalogowania siê przez uwierzytelnienie
+			przez klucz prywatny. tylko na haslo (tak jak opisane powy¿ej).
+			uwierzytelnianie kluczami s± nam do niczego.
+		ssh powinno byæ napisane do¶æ przejrzy¶cie i ³adnie, bo jak widac powy¿ej
+			ma dzia³aæ prosto, wiêc kod te¿ powinien byæ prosty
 

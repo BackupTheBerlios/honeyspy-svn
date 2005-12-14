@@ -49,11 +49,16 @@ sub validateData {
 	return 0 unless $data;
 
 	switch ($data) {
-		case m'\.\./\.\./\.\./'      {  return 80; }
-		case m'(%s.*){2,}'           {  return 80; }
-		case m'bin/sh'               { return 100; }
-		case m'bin/\w+sh'            { return 100; }
-		case { length($_[0]) > 256 } {  return 50; }
+		# directory traversal
+		case m'\.\./\.\./\.\./'      { return 0.8; }
+		# format string
+		case m'(%s.*){2,}'           { return 0.8; }
+		case m'%n'                   { return 1.0; }
+		# shell
+		case m'bin/sh'               { return 1.0; }
+		case m'bin/\w+sh'            { return 1.0; }
+		# buffer overflow?
+		case { length($_[0]) > 256 } { return 0.5; }
 	}
 
 	return 0;
