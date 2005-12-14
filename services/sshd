@@ -64,6 +64,9 @@ class EchoProtocol(protocol.Protocol):
     """this is our example protocol that we will run over SSH
     """
     komeda = ""
+
+    def connectionMade(self):
+        self.transport.write("[/tmp]$ ");
     def dataReceived(self, data):
         if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
             self.transport.write('\r\n');
@@ -76,6 +79,7 @@ class EchoProtocol(protocol.Protocol):
              self.komeda +=data
         self.transport.write(data)
 
+        
 publicKey = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3/c9k2I/Az64fxjHf9imyRJbixtQhlH9lfNjUIx+4LmrJH5QNRsFporcHDKOTwTTYLh5KmRpslkYHRivcJSkbh/C+BR3utDS555mV'
 
 privateKey = """-----BEGIN RSA PRIVATE KEY-----
