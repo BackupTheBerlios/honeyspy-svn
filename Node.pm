@@ -95,6 +95,12 @@ sub new {
 		'fingerprints' => {},
 		'p0f_pid' => undef,
 		'p0f_fh' => undef,
+		'p0f_opts' => {
+			'fuzzy' => '0',
+			'promiscuous' => '1',
+			'masq_detection' => '0',
+			'mode' => '0',
+		},
 
 		# Handlery dla zdarzen na uchwytach plikow
 		'r_handlers' => {},
@@ -790,7 +796,15 @@ sub enableP0f {
 
 	my ($rdfh, $wrfh);
 	eval {
-		my $pid = open2($rdfh, $wrfh, 'exec p0f -q -l -p 2>&1');
+		my $args = '';
+		$args .= '-F ' if $self->{'p0f_opts'}{'fuzzy'};
+		$args .= '-p ' if $self->{'p0f_opts'}{'promiscuous'};
+		$args .= '-M ' if $self->{'p0f_opts'}{'masq_detection'};
+		my $mode = $self->{'p0f_opts'}{'mode'};
+		$args .= '-A ' if $mode == 1;
+		$args .= '-R ' if $mode == 2;
+
+		my $pid = open2($rdfh, $wrfh, "exec p0f -q -l $args 2>&1");
 		$self->{'p0f_pid'} = $pid;
 		$self->{'p0f_fh'} = $rdfh;
 		$self->{'r_set'}->add($rdfh);
@@ -811,10 +825,28 @@ sub disableP0f {
 	my ($self) = @_;
 	$logger->info('Disabling p0f...');
 
+	if (defined $self->{'p0f_fh'}) {
+		$self->_removefh($self->{'p0f_fh'});
+		$self->{'p0f_fh'} = undef;
+	}
+
 	CORE::kill 9, $self->{'p0f_pid'}
 		if defined $self->{'p0f_pid'};
 }
 
+sub setP0fOption {
+	my ($self, %opts) = @_;
+
+	$self->{'p0f_opts'}{$_} = $opts{$_}
+		foreach (keys %opts);
+
+	if ($self->{'p0f_fh'}) {
+		$self->disableP0f();
+		$self->enableP0f();
+	}
+
+	return 0;
+}
 
 
 #####################################

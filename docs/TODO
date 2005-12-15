@@ -4,6 +4,12 @@ Skrypt wspolny dla modulow uslug
 interfejs webowy [raczej du¿a rzecz, w Template::Toolkit powinni¶my]
 zrobiæ przesy³anie logów [mam wstêpny pomys³]
 zrobiæ wspólny interfejs do logowania zdarzeñ z poziomu na przyk³ad us³ug
+naprawiæ buga:
+	setServiceLimit 1
+	addService 0 tcp 5050 services/smtp
+	przekroczyæ limit
+	getServicesList
+	konsola wypisuje fragment logu zamiast liczby
 uslugi
 	rozbudowaæ us³ugi [przyjemne, proste]
 	ssh

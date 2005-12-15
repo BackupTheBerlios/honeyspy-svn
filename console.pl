@@ -54,6 +54,7 @@ use constant COMPLETION_LIST => [qw/
 
 	enableP0f
 	disableP0f
+	setP0fOption
 
 	enablePcap
 	addFilter
