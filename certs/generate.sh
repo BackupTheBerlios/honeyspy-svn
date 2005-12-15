@@ -23,73 +23,107 @@
 #
 
 DAYS=365
+COUNTRY=PL
 
 readkey() {
-	local tn
+	local yn
 	while :; do
-		echo "$1 [t/n]"
-		read -n 1 -s tn
-		[ "$tn" = t -o "$tn" = n ] && break
+		echo "$1 [y/n]"
+		read -n 1 -s yn
+		[ "$yn" = y -o "$yn" = n ] && break
 	done
-	[ $tn = t ];
+	[ $yn = y ];
 }
 
 if [ "$1" = 'clean' ]; then
-	if readkey 'Usun±æ wszystkie klucze i certyfikaty?'; then
-		rm *.enc *.pem *.csr && echo "Usuniêto";
+	if readkey 'Delete ALL keys and certificates?'; then
+		rm *.enc *.pem *.csr && echo "Done";
 		exit 0;
 	fi
 	exit 1;
 fi
 
 if [ "$1" = 'master' ]; then
-	echo 'Tworzenie kluczy i certyfikatu serwera centralnego.'
-	echo 'Certyfikat bêdzie równie¿ u¿ywany przez centrum certyfikacyjne'
+	echo 'Creating keys and certificate for master server.'
+	echo 'Certificate will be used for this network certification authority as well'
 	echo
 
 	openssl genrsa -des3 -out master-key.enc 1024
 	openssl rsa -in master-key.enc -out master-key.pem
-	openssl req -subj '/C=PL/O=HoneySpy network/OU=Master Server/CN=Master' -new -x509 -days $DAYS -key master-key.pem -out master-cert.pem
+	openssl req -subj '/C='$COUNTRY'/O=HoneySpy network/OU=Master Server/CN=Master' -new -x509 -days $DAYS -key master-key.pem -out master-cert.pem
 
 	echo
-	readkey 'Pokazaæ certyfikat?' && \
+	readkey 'Show certificate?' && \
 		openssl x509 -noout -text -in master-cert.pem
 
 	exit 0
 fi
 
-if [ "$1" = 'sensor' -o "$1" = 'admin' ]; then
-	echo "Tworzenie kluczy i certyfikatu klienta ($1) sieci"
-	echo 
+if [ "$1" = 'sensor' ]; then
+	echo "Creating keys and certificate for sensor"
 
-	if [ ! -f master-key.pem -o ! -f master-cert.pem ]; then
-		echo "B³±d: Nie istniej± klucze lub certyfikat serwera centralnego."
-		echo "U¿yj najpierw $0 master"
-		echo
-		exit 1
-	fi
-
-	mkdir -p demoCA/newcerts 2>/dev/null
-	touch demoCA/index.txt
-	[ ! -e demoCA/serial ] && echo 01 > demoCA/serial
-
-	echo "Nazwa klienta: "
+	echo "Sensor's name: "
 	read name
 	[ "$name" ] || exit 1
 
 	openssl genrsa -des3 -out "$name-key.enc" 1024
 	openssl rsa -in "$name-key.enc" -out "$name-key.pem"
-	openssl req -subj "/C=PL/O=HoneySpy network/OU=$1/CN=$name" -new -key "$name-key.pem" -out "$name.csr"
+	openssl req -subj "/C=$COUNTRY/O=HoneySpy network/OU=$1/CN=$name" -new -key "$name-key.pem" -out "$name.csr"
+
+	exit 0;
+fi
+
+if [ "$1" = 'sign' ]; then
+	echo 'Signing node'\''s certificate'
+	echo
+
+	if [ ! -f master-key.pem -o ! -f master-cert.pem ]; then
+		echo "Error: There is no master's key nor certificate"
+		echo "Please use ,,$0 master'' first"
+		echo
+		exit 1
+	fi
+
+	echo "Signature request file (.csr):";
+	read csr
+	[ -z "$csr" ] && exit 1
+
+	if [ ! -f "$csr" ]; then
+		echo "No such file: $csr"
+		exit 1
+	fi
+
+	echo "Certificate (output) file name:"
+	read result
+	[ -z "$result" ] && exit 1
+
 	openssl ca -policy policy_anything -keyfile master-key.pem \
-		-cert master-cert.pem -in "$name.csr" -out "$name-cert.pem"
+		-cert master-cert.pem -in "$csr" -out "$result"
 
 	echo
-	readkey 'Pokazaæ certyfikat?' && \
-		openssl x509 -noout -text -in "$name-cert.pem"
+	readkey 'Show certificate?' && \
+		openssl x509 -noout -text -in "$result"
+
+	exit 0
+fi
+
+if [ "$1" = 'admin' ]; then
+	echo "Creating keys and certificate for admin"
+	echo 
+
+	name='admin'
+	if [ -e "$name-key.pem" -o -e "$name-cert.pem"]; then
+		echo "Admin's key or certificate already exists";
+		exit 1
+	fi
+
+	openssl genrsa -des3 -out "$name-key.enc" 1024
+	openssl rsa -in "$name-key.enc" -out "$name-key.pem"
+	openssl req -subj "/C=$COUNTRY/O=HoneySpy network/OU=$1/CN=$name" -new -key "$name-key.pem" -out "$name.csr"
 
 	exit 0
 fi
 
 
-echo -e "U¿ycie:\n\t$0 clean|master|sensor|admin";
+echo -e "Usage:\n\t$0 clean|master|sensor|admin|sign";
 
