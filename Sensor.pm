@@ -83,7 +83,12 @@ sub read {
 	$logger->debug("Reading data from sensor");
 
 	do {
-		if ($sock->peek(undef, 1) == 0) {
+		my $peek = $sock->peek(undef, 1);
+		if (!defined $peek) {
+			$logger->error("peek(): $!");
+			return -2;
+		}
+		if ($peek == 0) {
 			$logger->info("Sensor closed connection");
 			$self->{'master'}->remove_sensor($self);
 			return -1;

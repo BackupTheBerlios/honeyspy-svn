@@ -28,7 +28,7 @@ my $nazwa_serwera="localhost";
 
 print "220 $nazwa_serwera ESMTP Welcome\n";
 
-while(defined($komeda = <STDIN>) {
+while(defined($komeda = <STDIN>)) {
 	chop $komeda;
 
 	#musi byc poza switchem bo w casie w znakach {} nie widac juz zmiennej $1

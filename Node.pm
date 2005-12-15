@@ -77,6 +77,8 @@ sub new {
 		'ports' => {},             # dzialajace uslugi
 											# "addr/proto/port" ->
 											#	 {socket -> ..., script -> ..., args -> ...}
+		'processes_spawned' => 0,
+		'processes_limit' => 10,
 
 		# Interfejs nasluchiwania (PCAP)
 		'pcap' => undef,
@@ -786,8 +788,6 @@ sub enableP0f {
 	my ($self) = @_;
 	$logger->info('Enabling p0f...');
 
-	$SIG{CHLD} = 'IGNORE';
-
 	my ($rdfh, $wrfh);
 	eval {
 		my $pid = open2($rdfh, $wrfh, 'exec p0f -q -l -p 2>&1');
@@ -848,18 +848,23 @@ sub addService {
 			$logger->error("Couldn't accept connection ($!)");
 			return 1;
 		}
-		$logger->debug("Connection to service $script from " . $client->peerhost);
-		$SIG{'CHLD'} = 'IGNORE';
+		$logger->info("Connection to service $script from " . $client->peerhost);
+		if ($self->{'processes_spawned'} >= $self->{'processes_limit'}) {
+			$logger->error("Maximum processes already running. Dropping connection");
+			close $client;
+			return 1;
+		}
+
 		my $pid = fork();
 		if (! $pid) {
 			setsid();
 			open(STDIN, "<&=".fileno($client));
 			open(STDOUT, ">&=".fileno($client));
-#			open(STDERR, ">&=".fileno($client));
 			{ exec($script, @args); }
 			$logger->error("Couldn't run script ($!)");
-			return 1;
+			exit 1;
 		}
+		$self->{'processes_spawned'}++;
 	};
 
 	return 0;
@@ -906,6 +911,21 @@ sub getService {
 	return %result;
 }
 
+#
+# Ustawia ile maksymalnie moze dzialaæ jednocze¶nie 
+# modulow z imitacjami uslug
+#
+sub setServicesLimit {
+	my ($self, $limit) = @_;
+	return unless defined $limit;
+
+	$self->{'processes_limit'} = $limit;
+}
+
+sub getServicesLimit {
+	my ($self) = @_;
+	return $self->{'processes_limit'};
+}
 
 
 ######################################################
@@ -919,6 +939,13 @@ sub run {
 	local $| = 1;
 	$SIG{'PIPE'} = sub {
 		$logger->warn('Broken pipe');
+	};
+	$SIG{'CHLD'} = sub {
+		$self->{'processes_spawned'}--
+			if $self->{'processes_spawned'} > 0;
+		my $msg = "Subprocess finished ";
+		$msg .= "(running: ".$self->{'processes_spawned'}."/".$self->{'processes_limit'}.").";
+		$logger->info($msg);
 	};
 
 	if ($self->{'mode'} eq 'sensor') {
@@ -975,7 +1002,12 @@ sub run {
 sub process_command {
 	my ($self, $sock) = @_;
 
-	if ($sock->peek(undef, 1) == 0) {
+	my $peek = $sock->peek(undef, 1);
+	if (!defined $peek) {
+		$logger->error("peek() : $!");
+		return;
+	}
+	if ($peek == 0) {
 		Log::Log4perl->eradicate_appender('MasterAppender');
 		$self->{'appender'} = undef;
 		$logger->debug("My master closed connection.");
@@ -1037,18 +1069,11 @@ sub runOnNode {
 	my $sensor = $self->{'sensors'}{$name};
 	my $socket = $sensor->{'socket'};
 
-#	$self->_addfh($socket, 'w');
-#	$self->{'w_handlers'}{$socket} = sub {
-
 	$sensor->call($function, wantarray, @args);
 
-#	};
-
-#	$sensor->sendToPeer($function, wantarray, @args);
-
 	# XXX
-	# tu by sie przydalo poprawic asynchronicznosc
-	# ale byloby to bardzo trudne
+	# tutaj mamy slabo asynchronicznosc,
+	# ale zmienienie tego jest bardzo trudne
 	# 
 	my @ret = $sensor->read('return_code');
 	$sensor->{'command_in_progress'} = 0;
@@ -1058,4 +1083,4 @@ sub runOnNode {
 
 1;
 
-# vim: set tw=3 sw=3 ft=perl:
+# vim: set ts=3 sw=3 ft=perl:

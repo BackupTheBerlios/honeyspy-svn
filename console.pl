@@ -37,6 +37,8 @@ use constant COMPLETION_LIST => [qw/
 	addService
 	delService
 	getService
+	getServicesLimit
+	setServicesLimit
 
 	addIPAlias
 	delIPAlias
