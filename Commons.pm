@@ -42,7 +42,7 @@ sub sendDataToSocket {
 #
 # Metoda oceniaj±ca ³añcuch. Czy wystepuje w nim co¶,
 # co wskazuje, ¿e jest to jaki¶ atak, exploit itp.
-# Zwraca warto¶æ 0..100 -- prawdopodobieñstwo ¿e jest to atak
+# Zwraca warto¶æ 0..1 -- prawdopodobieñstwo ¿e jest to atak
 #
 sub validateData {
 	my ($data) = @_;
@@ -50,15 +50,19 @@ sub validateData {
 
 	switch ($data) {
 		# directory traversal
-		case m'\.\./\.\./\.\./'      { return 0.8; }
+		case m'\.\./\.\./\.\./'                 { return 0.8; }
 		# format string
-		case m'(%s.*){2,}'           { return 0.8; }
-		case m'%n'                   { return 1.0; }
+		case m'(%s.*){2,}'                      { return 0.8; }
+		case m'%n'                              { return 1.0; }
 		# shell
-		case m'bin/sh'               { return 1.0; }
-		case m'bin/\w+sh'            { return 1.0; }
+		case m'bin/sh'                          { return 1.0; }
+		case m'bin/\w+sh'                       { return 1.0; }
+		# SQL Injection
+		case m"'\s*OR (SELECT|UPDATE|INSERT)"   { return 0.8; }
+		# unescaped metacharacters
+		case m'(;|\|).*wget'                    { return 0.5; }
 		# buffer overflow?
-		case { length($_[0]) > 256 } { return 0.5; }
+		case { length($_[0]) > 256 }            { return 0.5; }
 	}
 
 	return 0;

@@ -22,8 +22,6 @@ my %DATA = (
 
 );
 foreach my $data (keys %DATA) {
-	print "$data -> " . Commons::validateData($data);
-	print "\n";
 	ok(Commons::validateData($data) == $DATA{$data}, 'Commons::validateData');
 }
 
