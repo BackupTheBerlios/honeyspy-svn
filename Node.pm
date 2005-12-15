@@ -24,7 +24,7 @@ use IO::Select;
 use Log::Log4perl (':easy');
 use MasterAppender;
 use Storable qw(nstore_fd freeze thaw);
-use IO::Socket::SSL; # qw(debug4);
+use IO::Socket::SSL;
 use IO::Socket::INET;
 use NetPacket::Ethernet qw(:strip);
 use NetPacket::Ethernet;
@@ -38,6 +38,7 @@ use IPC::Open2;
 
 use Master;
 use Commons;
+use FHTrapper;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -890,6 +891,8 @@ sub addService {
 		my $pid = fork();
 		if (! $pid) {
 			setsid();
+			POSIX::close(3);
+			POSIX::dup(1);
 			open(STDIN, "<&=".fileno($client));
 			open(STDOUT, ">&=".fileno($client));
 			{ exec($script, @args); }

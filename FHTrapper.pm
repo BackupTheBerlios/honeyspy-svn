@@ -18,7 +18,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-package StderrTrapper;
+package FHTrapper;
 
 use Log::Log4perl qw(:easy);
 
@@ -33,4 +33,6 @@ sub PRINT {
 	$logger->info(@data);
 	$Log::Log4perl::caller_depth--;
 }
+
+1;
 

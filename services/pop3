@@ -21,8 +21,11 @@ use strict;
 use Switch;
 
 my $komeda;
-my $user = 0;
+my $state = 0;
+my($user, $pass);
 $| = 1;
+
+open(LOG, '>&=3');
 
 print "+OK POP3 Ready localhost\n";
 
@@ -32,12 +35,19 @@ while(defined($komeda = <STDIN>)) {
 	switch($komeda){
 		case /^USER /{
 			print "+OK\n";
-			$user = 1;
+			$state = 1;
+
+			$komeda =~ m/^USER (.*)/;
+			$user = $1;
 		}
 
 		case /^PASS / {
-			if($user == 1) {
+			if($state == 1) {
 				print "-ERR Invalid password or username\n";
+
+				$komeda =~ m/^PASS (.*)/;
+				$pass = $1;
+				print LOG "Client tried to login with $user $pass\n";
 			}
 			else {
 				print "-ERR give username first\n";
@@ -48,8 +58,9 @@ while(defined($komeda = <STDIN>)) {
 			exit 0;
 		}
 		else {
-			if($user == 1) {
+			if($state == 1) {
 				print "-ERR use PASS password\n";
+				print LOG 
 			}
 			else {
 				print "-ERR use USER name\n";
@@ -57,3 +68,6 @@ while(defined($komeda = <STDIN>)) {
 		}
 	}
 }
+
+close LOG;
+
