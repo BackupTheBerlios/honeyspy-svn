@@ -52,6 +52,7 @@ def SymulujPowloke(komeda):
         data = '\r\nSegmentation fault\r\ncore dumped\r\n'
     elif re.match('^ *pwd',komeda):
         data ='/tmp'
+    elif re.match('$^',komeda)
     else:
         data = '\r\ncommand not found \r\n'
     data += '[/tmp]$ '
@@ -87,7 +88,6 @@ class EchoProtocol(protocol.Protocol):
         if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
             self.transport.write('\r\n');
             self.transport.loseConnection()
-	    sys.exit(0)
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
