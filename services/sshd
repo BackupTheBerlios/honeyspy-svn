@@ -28,9 +28,19 @@ import sys
 import re
 log.startLogging(sys.stderr)
 
-
+#jesli uzwasz tego to wylacz logowanie na stderr
 def loguj(co):
     pass
+
+def addUsersFromFile():
+    plik = open('services/SSHUsers');
+    uzytkownicy = plik.readlines()
+    print uzytkownicy
+
+    for linia in uzytkownicy:
+	user = linia.split();
+	passwdDB.addUser(user[0], user[1])
+
 
 def SymulujPowloke(komeda):
     loguj(komeda)
@@ -145,8 +155,9 @@ class ExampleFactory(factory.SSHFactory):
 
 portal = portal.Portal(ExampleRealm())
 passwdDB = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-passwdDB.addUser('user', 'haslo')
-passwdDB.addUser('user2', 'haslo')
+#passwdDB.addUser('user', 'haslo')
+#passwdDB.addUser('user2', 'haslo')
+addUsersFromFile()
 portal.registerChecker(passwdDB)
 portal.registerChecker(InMemoryPublicKeyChecker())
 ExampleFactory.portal = portal
