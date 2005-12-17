@@ -52,7 +52,8 @@ def SymulujPowloke(komeda):
         data = '\r\nSegmentation fault\r\ncore dumped\r\n'
     elif re.match('^ *pwd',komeda):
         data ='/tmp'
-    elif re.match('$^',komeda)
+    elif re.match('$\s*^',komeda):
+	data = '\r\n'
     else:
         data = '\r\ncommand not found \r\n'
     data += '[/tmp]$ '
