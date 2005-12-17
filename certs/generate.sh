@@ -112,7 +112,7 @@ if [ "$1" = 'admin' ]; then
 	echo 
 
 	name='admin'
-	if [ -e "$name-key.pem" -o -e "$name-cert.pem"]; then
+	if [ -e "$name-key.pem" -o -e "$name-cert.pem" ]; then
 		echo "Admin's key or certificate already exists";
 		exit 1
 	fi

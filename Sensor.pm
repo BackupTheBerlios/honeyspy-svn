@@ -92,16 +92,16 @@ sub _recvFromPeer {
 
 
 
-
-
-sub info() {
-	$logger->debug("--- Jestem sensor ${\($_[0]->{name})}\n");
-}
-
-sub getName() {
-	return shift->{'name'};
-}
-
+#
+#
+# sub info() {
+# 	$logger->debug("--- Jestem sensor ${\($_[0]->{name})}\n");
+# }
+# 
+# sub getName() {
+# 	return shift->{'name'};
+# }
+#
 
 #
 # Czyta komunikat od sensora (sa dane)
@@ -150,15 +150,15 @@ sub doOnReturn {
 	$self->{'return_handler'} = $handler;
 }
 
+
 sub AUTOLOAD {
 	my ($self) = @_;
 	$logger->debug("I should try to run $AUTOLOAD via RPC:\n");
-	$self->call($AUTOLOAD, wantarray, @_);
-	my @ret = $self->read('return_code');
 
-	$self->{'command_in_progress'} = 0;
-
-	return @ret;
+	my $function = $AUTOLOAD;
+	$function =~ s/.*:://;
+	shift;
+	$self->call($function, wantarray, @_);
 }
 
 
