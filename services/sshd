@@ -70,6 +70,12 @@ class ExampleRealm:
     def requestAvatar(self, avatarId, mind, *interfaces):
         return interfaces[0], ExampleAvatar(avatarId), lambda: None
 
+class BezHasla:
+    implements(portal.IRealm)
+
+    def requestAvatar(self, avatarId, mind, *interfaces):
+        return True
+
 class EchoProtocol(protocol.Protocol):
     """this is our example protocol that we will run over SSH
     """
@@ -81,6 +87,7 @@ class EchoProtocol(protocol.Protocol):
         if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
             self.transport.write('\r\n');
             self.transport.loseConnection()
+	    sys.exit(0)
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
@@ -155,8 +162,6 @@ class ExampleFactory(factory.SSHFactory):
 
 portal = portal.Portal(ExampleRealm())
 passwdDB = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-#passwdDB.addUser('user', 'haslo')
-#passwdDB.addUser('user2', 'haslo')
 addUsersFromFile()
 portal.registerChecker(passwdDB)
 portal.registerChecker(InMemoryPublicKeyChecker())
