@@ -16,6 +16,33 @@ interfejs webowy [raczej du¿a rzecz, w Template::Toolkit powinni¶my]
 		dzialajace uslugi na wezle
 		przejscie do logow tego wezla
 
+		je¶li runOnNode i lokalnie -- shift i flaga local = 1
+
+przemodelowac trochê nasze uzycie wzorca Reactor
+	process_command:
+		_callFunction
+			wykonaæ odpowiedni± funkcjê
+				getName
+				info
+				...
+				runOnNode
+					jesli to wywolanie lokalne:
+						wywolac _callFunction i zwrocic jego rezultat
+					jesli nie ma takiego sensora:
+						zwrocic komunikat
+					ustawic handler, ktory wysle rozkaz do sensora,
+					gdy tylko bedzie to mozliwe:
+						ustawiæ handler obs³uguj±cy zwrocenie rezultaty przez sensor:
+					[*]	dodaæ w_handler odsylajacy odpowiedz do serwera ktory zlecil wykonanie rozkazu
+								odes³aæ 
+								usun±æ w_handler
+						wys³aæ rozkaz
+					zwrocic undefined
+			jesli funkcja zwrocila cokolwiek defined:
+				dodaæ w_handler odsylajacy odpowiedz do serwera ktory zlecil wykonanie rozkazu
+					odes³aæ 
+					usun±æ w_handler
+
 
 zrobiæ przesy³anie logów [mam wstêpny pomys³]
 zrobiæ wspólny interfejs do logowania zdarzeñ z poziomu na przyk³ad us³ug

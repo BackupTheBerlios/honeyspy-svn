@@ -20,6 +20,7 @@
 package Commons;
 
 use Storable qw(nstore_fd freeze thaw);
+use Log::Log4perl (':easy');
 use Switch;
 
 require Exporter;
@@ -29,13 +30,20 @@ our @EXPORT_OK = qw(
 	validateData
 );
 
+my $logger = get_logger();
+
 #
 # sendDataToSocket - Metoda statyczna, wysy³a dane na $sock
 #
 sub sendDataToSocket {
-	my ($sock, $serialized) = (shift, freeze [@_]);
-	print $sock pack('N', length($serialized));
-	print $sock $serialized;
+	eval {
+		my ($sock, $serialized) = (shift, freeze [@_]);
+		print $sock pack('N', length($serialized));
+		print $sock $serialized;
+	};
+	if ($@) {
+		$logger->error("Couldn't sent data to a socket");
+	}
 }
 
 

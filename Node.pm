@@ -59,11 +59,11 @@ sub new {
 	my ($class,  $config_file) = 
 		(ref($_[0]) || $_[0], $_[1]);
 
-	$logger->debug("konstruktor Node\n");
+	$logger->debug("Node constructor\n");
 
 	my $self = {
 		'name' => 'unnamed',
-		'socket' => \*STDOUT,
+		'master_sock' => undef,
 		'mode' => 'sensor',
 		'appender' => undef,
 
@@ -73,6 +73,7 @@ sub new {
 			'fingerprint' => undef, # falszowanie stosu
 			'mac' => undef,         # falszowanie adresow mac
 			'pcap' => undef,        # nasluchiwanie pakietow
+			'ipalias' => undef,     # ip aliasy
 		},
 		'interfaces' => [],
 		'ports' => {},             # dzialajace uslugi
@@ -346,9 +347,17 @@ sub _pcapPacket {
 	$logger->info($msg);
 }
 
+#
+# Jesli funkcja wywolana przez te funkcje zwrocila
+# cokolwiek defined, to _callFunction odesle to jako odpowiedz
+# do mastera.
+# Jesli funkcja wywolana zwrocila undef, to znaczy,
+# zeby nie odsylac, bo moze funkcja sama ustawi(la) w_handler
+#
 sub _callFunction {
 	my ($self, $function, $arrayctx, @args) = @_;
 	my @result;
+	my $local = 1;
 
 	eval {
 		no strict 'refs';
@@ -373,6 +382,18 @@ sub _callFunction {
 
 		$logger->error($result[0]);
 	}
+
+	if (defined($result[0])) {
+		my $master_sock = $self->{'master_sock'};
+		$self->{'w_handlers'}{$master_sock} = sub {
+			Commons::sendDataToSocket($master_sock, 'ret', @result);
+			$self->_removefh($master_sock, 'w');
+		};
+		$self->_addfh($master_sock, 'w');
+	}
+
+	return 0;
+
 	return @result;
 }
 
@@ -750,8 +771,7 @@ sub disablePcap {
 	return unless $self->{'pcap'};
 
 	my $fd = Net::Pcap::fileno($self->{'pcap'});
-	$self->{'r_set'}->remove($fd);
-	delete $self->{'r_handlers'}{$fd};
+	$self->_removefh($fd);
 
 	Net::Pcap::close($self->{'pcap'});
 	$self->{'pcap'} = undef;
@@ -777,7 +797,7 @@ sub enablePcap {
 	$self->_setupPcap();
 
 	my $fd = Net::Pcap::fileno($self->{'pcap'});
-	$self->{'r_set'}->add($fd);
+	$self->_addfh($fd, 'r');
 	$self->{'r_handlers'}{$fd} = sub {
 		$logger->debug("Got packet");
 		Net::Pcap::loop($self->{'pcap'}, 1, \&_pcapPacket, 'aaa');
@@ -808,7 +828,7 @@ sub enableP0f {
 		my $pid = open2($rdfh, $wrfh, "exec p0f -q -l $args 2>&1");
 		$self->{'p0f_pid'} = $pid;
 		$self->{'p0f_fh'} = $rdfh;
-		$self->{'r_set'}->add($rdfh);
+		$self->_addfh($rdfh, 'r');
 		$self->{'r_handlers'}{$rdfh} = sub {
 			$logger->info("OS recognized: " . <$rdfh>);
 		};
@@ -1072,16 +1092,9 @@ sub process_command {
 		$logger->debug("Running $function(@args) in "
 			. ($arrayctx?'list':'scalar') . ' context');
 
-		my @result = $self->_callFunction($function, $arrayctx, @args);
-		$logger->debug("Function result: @result");
-
-		$self->_addfh($sock, 'w');
-		$self->{'w_handlers'}{$sock} = sub {
-			unshift(@result, 'ret');
-			Commons::sendDataToSocket($sock, @result);
-			$self->_removefh($sock, 'w');
-		};
-
+		# XXX
+		$self->_callFunction($function, $arrayctx, @args);
+		return 0;
 	}
 }
 
@@ -1095,27 +1108,42 @@ sub runOnNode {
 
 	if ($name eq $self->{'name'}) {
 		no strict 'refs';
-		return $self->_callFunction($function, wantarray, @args);
+		$self->_callFunction($function, wantarray, @args);
+		return undef;
 	}
 
 	return "No such node: $name"
 		unless exists($self->{'sensors'}{$name});
 
+	#
+	# Odbedzie sie wywolanie zdalne
+	#
+
 	my $sensor = $self->{'sensors'}{$name};
-	my $socket = $sensor->{'socket'};
+	my $sensor_sock = $sensor->{'socket'};
 
-	$sensor->call($function, wantarray, @args);
+	$self->{'w_handlers'}{$sensor_sock} = sub {
+		$sensor->doOnReturn(sub {
+				my ($self, @ret) = @_;
+				my $node = $self->{'master'};
+				$self->doOnReturn(undef);
+				$logger->info(@ret);
+				$node->{'w_handlers'}{$node->{'master_sock'}} = sub {
+					Commons::sendDataToSocket(
+						$node->{'master_sock'}, 'ret', @ret);
+					$node->_removefh($node->{'master_sock'}, 'w');
+				};
+				$node->_addfh($node->{'master_sock'}, 'w');
+			});
+		$sensor->call($function, wantarray, @args);
+	};
+	$self->_addfh($sensor->{'socket'}, 'w');
 
-	# XXX
-	# tutaj mamy slabo asynchronicznosc,
-	# ale zmienienie tego jest bardzo trudne
-	# 
-	my @ret = $sensor->read('return_code');
-	$sensor->{'command_in_progress'} = 0;
-	return @ret;
+	return undef;
 }
 
 
 1;
 
 # vim: set ts=3 sw=3 ft=perl:
+

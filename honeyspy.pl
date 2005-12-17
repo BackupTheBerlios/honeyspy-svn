@@ -41,7 +41,7 @@ sub usage {
 	print "\n";
 
 	print "Usage:\n";
-	print "\t$0 [-h|--help] [-m|--master] -c|--config <config_file>\n\n";
+	print "   $0 [-h|--help] [-m|--master] -c|--config <config_file>\n\n";
 	exit $exitcode;
 }
 

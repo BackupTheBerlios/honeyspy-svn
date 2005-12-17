@@ -168,9 +168,6 @@ sub accept_client {
 	$self->{'sensors'}{$client_name} = $sensor;
 	$self->{'sensors'}{$socket} = $sensor;
 
-#	$self->{'w_handlers'}{$socket} = sub {
-#		$sensor->write();
-#	};
 	$self->{'r_handlers'}{$socket} = sub {
 		$sensor->read();
 	};

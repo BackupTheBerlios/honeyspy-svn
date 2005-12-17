@@ -29,8 +29,6 @@ use Commons;
 
 require Exporter;
 @ISA = qw(Exporter);
-# (nie wolno eksportowac metod)
-# @EXPORT = qw(sendToPeer recvFromPeer);
 
 my $logger = get_logger();
 
@@ -49,13 +47,16 @@ sub new {
 		'name' => undef,
 		'socket' => undef,
 		'master' => undef,
-		'command_in_progress' => 0,
+
+		# wywolywane przez sensor, gdy podlegly wezel zwrocil rezultat wykonanego rozkazu
+		'return_handler' => undef,
 	};
 
 
 	if (ref($_[1]) eq 'HASH')  {
 		foreach my $attr qw(name socket master) {
-			$self->{$attr} = $_[1]->{$attr} if defined $_[1]->{$attr};
+			$self->{$attr} = $_[1]->{$attr}
+				if defined $_[1]->{$attr};
 		}
 	}
 	else {
@@ -65,8 +66,36 @@ sub new {
 	return bless $self, $class;
 }
 
+
+sub _recvFromPeer {
+	my ($self) = @_;
+	my $sock = $self->{'socket'};
+	my $buf;
+
+	sysread($sock, $buf, 4);
+	my $len = unpack('N', $buf);
+	sysread($sock, $buf, $len);
+	my @resp;
+	eval {
+		@resp = @{thaw($buf)};
+	};
+	for ($@) {
+		if (/Magic number checking on storable string failed/) {
+			$logger->error("Wrong data received from sensor.");
+			return;
+		}
+	}
+	local $" = "\n   -> ";
+	$logger->debug("Received data from Sensor:\n   -> @resp\n");
+	return @resp;
+}
+
+
+
+
+
 sub info() {
-	$logger->debug("Jestem sensor ${\($_[0]->{name})}\n");
+	$logger->debug("--- Jestem sensor ${\($_[0]->{name})}\n");
 }
 
 sub getName() {
@@ -94,8 +123,9 @@ sub read {
 			return -1;
 		}
 
-		my ($type, @data) = $self->recvFromPeer();
+		my ($type, @data) = $self->_recvFromPeer();
 		if ($type eq 'ret') {
+			$self->{'return_handler'}($self, @data);
 			return @data;
 		}
 		elsif ($type eq 'log') {
@@ -112,35 +142,27 @@ sub read {
 }
 
 #
-# Pisze dane do sensora (gniazdo gotowe)
-# XXX istotnie nie uzywamy juz tego
+# ustawia funkcje, ktora bedzie wykonana w momencie,
+# gdy ten sensor zwrocil rezultat wyslanego mu rozkazu
 #
-sub write {
-	my ($self) = @_;
-	my ($sock) = $self->{'socket'};
-	$logger->debug("Writing data to sensor");
-
-#	$self->sendToPeer('info', 0);
-#	$self->{'master'}{'r_handlers'}{$sock} = sub {
-#		if ($self->read) {
-#			my $res = $self->recvFromPeer();
-#			$logger->info("Sensor replied: $res");
-#			$self->{'master'}->_removefh($sock, 'w');
-#		}
-#	};
-
-	$self->{'master'}->_removefh($self->{'socket'}, 'w');
+sub doOnReturn {
+	my ($self, $handler) = @_;
+	$self->{'return_handler'} = $handler;
 }
-
 
 sub AUTOLOAD {
-	$logger->debug("I should try tu ron $AUTOLOAD via RPC:\n");
-	shift->call($AUTOLOAD, wantarray, @_);
+	my ($self) = @_;
+	$logger->debug("I should try to run $AUTOLOAD via RPC:\n");
+	$self->call($AUTOLOAD, wantarray, @_);
+	my @ret = $self->read('return_code');
+
+	$self->{'command_in_progress'} = 0;
+
+	return @ret;
 }
 
 
 #
-# XXX
 # Wywo³uje zdalnie na tym sensorze podan± funkcjê
 #
 sub call {
@@ -151,8 +173,10 @@ sub call {
 		. ($arrayctx ? 'list' : 'scalar') . " context\n");
 
 	$self->sendToPeer($name, $arrayctx, @args);
-	$self->{'master'}->_removefh($self->{'socket'}, 'w');
-	$self->{'command_in_progress'} = 1;
+	$self->{'master'}->_removefh($self->{'socket'}, 'w')
+		if defined $self->{'master'};
+
+	return 0;
 }
 
 sub DESTROY {
@@ -167,28 +191,6 @@ sub sendToPeer {
 	return Commons::sendDataToSocket($sock, @_);
 }
 
-sub recvFromPeer {
-	my ($self) = @_;
-	my $sock = $self->{'socket'};
-	my $buf;
-
-	sysread($sock, $buf, 4);
-	my $len = unpack('N', $buf);
-	sysread($sock, $buf, $len);
-	my @resp;
-	eval {
-		@resp = @{thaw($buf)};
-	};
-	for ($@) {
-		if (/Magic number checking on storable string failed/) {
-			$logger->error("Wrong data received from sensor.");
-			return;
-		}
-	}
-	local $" = "\n   -> ";
-	$logger->debug("Received data from Sensor:\n   -> @resp\n");
-	return @resp;
-}
 
 1;
 
