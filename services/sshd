@@ -86,9 +86,9 @@ class EchoProtocol(protocol.Protocol):
             self.transport.write('\r\n');
             self.transport.loseConnection()
 	    try:
-                sys.exit(0)
+		sys.exit();
 	    except:
-		pass
+		sys.exit();
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
