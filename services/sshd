@@ -159,16 +159,33 @@ class ExampleFactory(factory.SSHFactory):
         'ssh-userauth': userauth.SSHUserAuthServer,
         'ssh-connection': connection.SSHConnection
     }
-    
 
-portal = portal.Portal(ExampleRealm())
-passwdDB = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-addUsersFromFile()
-portal.registerChecker(passwdDB)
-portal.registerChecker(InMemoryPublicKeyChecker())
-ExampleFactory.portal = portal
+from twisted.cred import checkers
+from twisted.cred import error, credentials
+from zope import interface
+class AnyUser:
+    interface.implements(checkers.ICredentialsChecker)
+
+    credentialInterfaces = (credentials.IUsernamePassword,
+        credentials.IUsernameHashedPassword)
+
+    def requestAvatarId(self, credentials):
+        return () 
+
+components.backwardsCompatImplements(AnyUser)
 
 if __name__ == '__main__':
+    portal = portal.Portal(ExampleRealm())
+    if len(sys.argv) == 2 and sys.argv[1] == '--requirepasswd':
+	passwdDB = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        addUsersFromFile()
+    else:
+        passwdDB = AnyUser()
+
+    portal.registerChecker(passwdDB)
+    portal.registerChecker(InMemoryPublicKeyChecker())
+    ExampleFactory.portal = portal
+
     #reactor.listenTCP(5022, ExampleFactory())
     #reactor.run()
     factory = ExampleFactory()
