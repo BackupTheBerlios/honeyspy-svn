@@ -52,7 +52,7 @@ def SymulujPowloke(komeda):
         data = '\r\nSegmentation fault\r\ncore dumped\r\n'
     elif re.match('^ *pwd',komeda):
         data ='/tmp'
-    elif re.match('$\s*^',komeda):
+    elif re.match('^\s*$',komeda):
 	data = '\r\n'
     else:
         data = '\r\ncommand not found \r\n'
@@ -72,11 +72,6 @@ class ExampleRealm:
     def requestAvatar(self, avatarId, mind, *interfaces):
         return interfaces[0], ExampleAvatar(avatarId), lambda: None
 
-class BezHasla:
-    implements(portal.IRealm)
-
-    def requestAvatar(self, avatarId, mind, *interfaces):
-        return True
 
 class EchoProtocol(protocol.Protocol):
     """this is our example protocol that we will run over SSH
@@ -85,10 +80,15 @@ class EchoProtocol(protocol.Protocol):
 
     def connectionMade(self):
         self.transport.write("[/tmp]$ ");
+
     def dataReceived(self, data):
         if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
             self.transport.write('\r\n');
             self.transport.loseConnection()
+	    try:
+                sys.exit(0)
+	    except:
+		pass
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
