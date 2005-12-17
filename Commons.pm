@@ -61,6 +61,8 @@ sub validateData {
 		case m"'\s*OR (SELECT|UPDATE|INSERT)"   { return 0.8; }
 		# unescaped metacharacters
 		case m'(;|\|).*wget'                    { return 0.5; }
+		# passwd file
+		case m'etc\/passwd'                     { return 0.6; }
 		# buffer overflow?
 		case { length($_[0]) > 256 }            { return 0.5; }
 	}

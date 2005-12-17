@@ -41,7 +41,7 @@ my $logger = get_logger();
 # 	referencja do obiekty klasy Master
 #
 
-sub new($) {
+sub new {
 	$logger->debug("konstruktor\n");
 
 	my $class = ref($_[0]) || $_[0];

@@ -1,15 +1,38 @@
 Skrypt wspolny dla modulow uslug
 	wyszukujacy ciagow ktore oznaczaja ataki (shellcody, %s itp)
 	z interfejsem do logowania
+
 interfejs webowy [raczej du¿a rzecz, w Template::Toolkit powinni¶my]
+	lista w postaci drzewka
+		mozliwosc przejscia do karty zarzadzania tylko jednym wezlem sieci
+
+		nazwa wezla
+		adres ip wezla sieci
+		zdolnosci danego wezla
+		aliasy ip wezla
+		falszowane adresy mac
+		falszowane charakterystyki stosow tcp/ip w zaleznosc od ip aliasu
+		reguly wylapywanych pakietow
+		dzialajace uslugi na wezle
+		przejscie do logow tego wezla
+
+
 zrobiæ przesy³anie logów [mam wstêpny pomys³]
 zrobiæ wspólny interfejs do logowania zdarzeñ z poziomu na przyk³ad us³ug
+	Node otwiera jeden nienazwany potok, przez podprocesy obs³ugi klienta
+	dziedziczone s± jego deskryptory. Jeden z koñców jest w nim duplikowany
+	na deskryptor 3, drugi zamykany.
+	W procesie Node'a ustawiony jest hadler -- gdy na koñcu do czytania
+	potoku pojawiaj± siê dane, to jest wywo³ywana funkcja czytaj±ca
+	z niego dane i zapisuj±ca do logów.
+
 naprawiæ buga:
 	setServiceLimit 1
 	addService 0 tcp 5050 services/smtp
 	przekroczyæ limit
 	getServicesList
 	konsola wypisuje fragment logu zamiast liczby
+
 uslugi
 	rozbudowaæ us³ugi [przyjemne, proste]
 	ssh

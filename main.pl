@@ -27,17 +27,43 @@ use Node;
 
 #Log::Log4perl->easy_init($DEBUG);
 
+sub usage {
+	my $exitcode = @_;
+	print "\n";
+	print "HoneySpy -- advance honeypot environment\n";
+	print "Copyright (C) 2005 Robert Nowotniak\n";
+	print "Copyright (C) 2005 Michal Wysokinski\n";
+	print "\n";
+	print "This program is free software; you can redistribute it and/or\n";
+	print "modify it under the terms of the GNU General Public License\n";
+	print "as published by the Free Software Foundation; either version 2\n";
+	print "of the License, or (at your option) any later version.\n";
+	print "\n";
+
+	print "Usage:\n";
+	print "\t$0 [-h|--help] [-m|--master] -c|--config <config_file>\n\n";
+	exit $exitcode;
+}
+
 Log::Log4perl::init('log4perl.conf');
 
 
 my($master_mode, $config, $help);
 
 if (!GetOptions(
-	'master|m' => \$master_mode,
+	'master|m'   => \$master_mode,
+	'help|h'     => \$help,
 	'config|c=s' => \$config,
-) || !defined $config) {
-	print "Usage:\n\t$0 [-m] -c <config_file>\n\n";
-	exit 1;
+)) {
+	usage(1); 
+}
+
+if (!defined $config) {
+	usage(1);
+}
+
+if ($help) {
+	usage(0);
 }
 
 my $node = $master_mode ?
