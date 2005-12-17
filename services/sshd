@@ -88,7 +88,7 @@ class EchoProtocol(protocol.Protocol):
 	    try:
 		sys.exit();
 	    except:
-		sys.exit();
+		sys.exc_info();
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
