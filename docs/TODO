@@ -67,6 +67,11 @@ naprawiæ buga:
 uslugi
 	rozbudowaæ us³ugi [przyjemne, proste]
 	ssh
+		nale¿y rozwi±zaæ problem:
+			gdy siê logujê na sshd, i zrobiê ctrl-c, gdy mam podaæ has³o,
+			to skrypt nie ginie ale wisi
+            Jest te¿ to samo gdy przy --locked kilka razy sie poda zle haslo
+
 		musi byæ jaki¶ argument np -o, --os [zrobiæ za pomoc± getopt lub optparse]
 			ten argument ma okreslac jaki banner w ssh bedzie wyswietlany
 		argument -l [lub --locked] okre¶la czy mo¿na siê zalogowaæ na dowoln±

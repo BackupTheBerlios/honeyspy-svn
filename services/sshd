@@ -2,103 +2,92 @@
 # HoneySpy -- advanced honeypot environment
 # Copyright (C) 2005  Robert Nowotniak
 # Copyright (C) 2005  Michal Wysokinski
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from twisted.cred import portal, checkers
+from twisted.cred import portal, checkers, error, credentials
 from twisted.conch import error, avatar
 from twisted.conch.checkers import SSHPublicKeyDatabase
 from twisted.conch.ssh import factory, userauth, connection, keys, session
+from twisted.conch.ssh.transport import SSHServerTransport, SSHTransportBase;
 from twisted.internet import reactor, protocol, defer, stdio
-from twisted.python import log
+from twisted.python import log, components
 from zope.interface import implements
-import sys
-import os
-import re
+from zope import interface
+from random import randint
+from os import kill, fdopen, fsync, getpid
+import sys, re, getopt
+
 #log.startLogging(sys.stderr)
 
-#jesli uzwasz tego to wylacz logowanie na stderr
-def loguj(co):
-    pass
+###########################################
+# domyslne ustawienia imitacji serwera SSH
+#
+locked = False
+users_filename = 'services/SSHUsers'
+version = 'SSH-1.99-OpenSSH_3.8.1p1 Debian-8.sarge.4'
+uname = 'Linux rocket 2.6.12-gentoo-r10 #2 SMP ' \
+    + 'Sun Sep 25 13:45:33 CEST 2005 i686 AMD Sempron(tm)' \
+    + '2800+ AuthenticAMD GNU/Linux\r\n';
+prompt = '[%(cwd)s]$ '
 
-def addUsersFromFile():
-    plik = open('services/SSHUsers');
-    uzytkownicy = plik.readlines()
-    plik.close()
+############################################
+# Definicje prostych funkcji komend powloki
+#
+def uptime(shell, args):
+    return ' %d:%d:%d up  %d days, %d users,   load average: %d.00, %d.00, %d.00\r\n' \
+        % (randint(0,23), randint(0,60), randint(0,60), randint(0,100), \
+                randint(0,30), randint(0,30), randint(0,30), randint(0,30));
 
-    print uzytkownicy
+def exit(shell, args):
+    kill(0, 9)
 
-    for linia in uzytkownicy:
-	user = linia.split();
-	passwdDB.addUser(user[0], user[1])
-
-
-def SymulujPowloke(komeda):
-    loguj(komeda)
-    if re.match(' *ls',komeda):
-        data = '\r\n ls dziala\r\n'
-    elif re.match(' *wget^',komeda):
-        data ='\r\n tu wyswietl help do wget \r\n'
-    elif re.match(' *wget',komeda):
-        data = '\r\nSegmentation fault\r\ncore dumped\r\n'
-    elif re.match('^ *pwd',komeda):
-        data ='/tmp'
-    elif re.match('^\s*$',komeda):
-	data = '\r\n'
+def cd(shell, args):
+    if len(args) > 1:
+        shell.cwd = args[1]
     else:
-        data = '\r\ncommand not found \r\n'
-    data += '[/tmp]$ '
-    return data;
+        shell.cwd = '~'
+    return ''
 
-class ExampleAvatar(avatar.ConchUser):
+def echo(shell, args):
+    return ' '.join(args[1:]) + '\r\n'
 
-    def __init__(self, username):
-        avatar.ConchUser.__init__(self)
-        self.username = username
-        self.channelLookup.update({'session':session.SSHSession})
+def pwd(shell, args):
+    return shell.cwd + '\r\n'
 
-class ExampleRealm:
-    implements(portal.IRealm)
+commands = {
+    'ls'     : 'ls dziala\r\n',
+    'wget'   : 'Segmentation fault (Core dumped)\r\n',
+    'uptime' : uptime,
+    'uname'  : uname,
+    'exit'   : exit,
+    'cd'     : cd,
+    'logout' : exit,
+    'echo'   : echo,
+    'pwd'    : pwd,
+    ''       : '',
+}
 
-    def requestAvatar(self, avatarId, mind, *interfaces):
-        return interfaces[0], ExampleAvatar(avatarId), lambda: None
 
-
-class EchoProtocol(protocol.Protocol):
-    """this is our example protocol that we will run over SSH
-    """
-    komeda = ""
-
-    def connectionMade(self):
-        self.transport.write("[/tmp]$ ");
-
-    def dataReceived(self, data):
-        if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
-            self.transport.write('\r\n');
-            self.transport.loseConnection()
-            os._exit(0) 
-            return
-        elif data == '\r':
-            data = SymulujPowloke(self.komeda)
-            self.komeda = ""
-        else:
-             self.komeda +=data
-        self.transport.write(data)
-
-        
-publicKey = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3/c9k2I/Az64fxjHf9imyRJbixtQhlH9lfNjUIx+4LmrJH5QNRsFporcHDKOTwTTYLh5KmRpslkYHRivcJSkbh/C+BR3utDS555mV'
+#####################
+# Klucze serwera SSH
+#
+publicKey = '\
+ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3\
+/c9k2I/Az64fxjHf9imyRJbixtQhlH9lfNjUIx+4LmrJH5QNRsFporcHDKOTwTTY\
+Lh5KmRpslkYHRivcJSkbh/C+BR3utDS555mV'
 
 privateKey = """-----BEGIN RSA PRIVATE KEY-----
 MIIByAIBAAJhAK8ycfDmDpyZs3+LXwRLy4vA1T6yd/3PZNiPwM+uH8Yx3/YpskSW
@@ -114,41 +103,119 @@ EhQ0wahUTCk1gKA4uPD6TMTChavbh4K63OvbKg==
 -----END RSA PRIVATE KEY-----"""
 
 
-class InMemoryPublicKeyChecker(SSHPublicKeyDatabase):
+#
+# Funkcja uzywana do logowania danych do HoneySpy'a
+#
+def logData(msg):
+    LOG.write('['+str(getpid())+'] SSH command: ' + msg + '\r\n')
+    LOG.flush()
 
-    def checkKey(self, credentials):
-        return credentials.username == 'user' and \
-            keys.getPublicKeyString(data=publicKey) == credentials.blob
+#
+# Ustawienie opcji zgodnie z argumetnami wywolania
+#
+def parseArgs():
+    global locked, os, users_filename, version, uname, commands
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:],
+                'lo:f:v:u:',
+                ['locked=', 'os=', 'users-file=', 'version=', 'uname='])
+    except getopt.GetoptError, a:
+        print 'Getopt error:', a
+        sys.exit(2)
+
+    for opt, arg in optlist:
+        if opt in ('-l', '--locked'):
+            locked = True
+        if opt in ('-o', '--os'):
+            os = arg
+        if opt in ('-f', '--users-file'):
+            users_filename = arg
+        if opt in ('-v', '--version'):
+            version = arg
+        if opt in ('-u', '--uname'):
+            commands['uname'] = arg + '\r\n'
+
+
+class ShellSimulationProtocol(protocol.Protocol):
+    def __init__(self):
+        self.cmdline = ''
+        self.cwd = '/tmp'
+        self.prompt = prompt
+
+    def executeCommand(self, cmdline):
+        logData(cmdline)
+
+        global commands
+        tokens = cmdline.split()
+        if len(tokens) == 0:
+            tokens = ['']
+        if tokens[0] in commands:
+            result = commands[tokens[0]]
+            if type(result) == type(''):
+                data = result
+            else:
+                data = result(self, tokens)
+        else:
+            data = 'bash: '+tokens[0]+': command not found\r\n'
+        return data;
+
+    def printPrompt(self):
+        self.transport.write(prompt % {'cwd':self.cwd});
+
+    def connectionMade(self):
+        self.printPrompt()
+
+    def dataReceived(self, data):
+        if data == '\x03': #^C
+            self.executeCommand('exit')
+        elif data == '\r':
+            data = self.executeCommand(self.cmdline)
+            self.transport.write('\r\n' + data)
+            self.printPrompt()
+            self.cmdline = ""
+        else:
+             self.cmdline += data
+             self.transport.write(data)
+
+#############################################################
+# Klasy realizujace rozne aspekty polaczenia protokolu SSH
+#
+class SSHAvatar(avatar.ConchUser):
+    def __init__(self, username):
+        avatar.ConchUser.__init__(self)
+        self.username = username
+        self.channelLookup.update({'session':session.SSHSession})
+
+class SSHRealm:
+    implements(portal.IRealm)
+    def requestAvatar(self, avatarId, mind, *interfaces):
+        return interfaces[0], SSHAvatar(avatarId), lambda: None
 
 class ExampleSession:
-    
     def __init__(self, avatar):
-        """
-        We don't use it, but the adapter is passed the avatar as its first
-        argument.
-        """
-
+        pass
     def getPty(self, term, windowSize, attrs):
         pass
-    
     def execCommand(self, proto, cmd):
-        raise Exception("no executing commands")
-
+        kill(0, 9)
     def openShell(self, trans):
-        ep = EchoProtocol()
+        ep = ShellSimulationProtocol()
         ep.makeConnection(trans)
         trans.makeConnection(session.wrapProtocol(ep))
-
     def eofReceived(self):
         pass
-
     def closed(self):
         pass
 
-from twisted.python import components
-components.registerAdapter(ExampleSession, ExampleAvatar, session.ISession)
+class SSHServerTransportVersion(SSHServerTransport):
+    def __init__(self, version):
+        self.ourVersionString = version
+        return
+    def connectionLost(self, reason):
+        SSHServerTransport.connectionLost(self, reason)
+        kill(0, 9)
 
-class ExampleFactory(factory.SSHFactory):
+class HoneySpySSHFactory(factory.SSHFactory):
     publicKeys = {
         'ssh-rsa': keys.getPublicKeyString(data=publicKey)
     }
@@ -159,37 +226,72 @@ class ExampleFactory(factory.SSHFactory):
         'ssh-userauth': userauth.SSHUserAuthServer,
         'ssh-connection': connection.SSHConnection
     }
+    def buildProtocol(self, addr):
+        t = SSHServerTransportVersion(version)
+        t.supportedPublicKeys = self.privateKeys.keys()
+        if not self.primes:
+            ske = t.supportedKeyExchanges[:]
+            ske.remove('diffie-hellman-group-exchange-sha1')
+            t.supportedKeyExchanges = ske
+        t.factory = self
+        return t
 
-from twisted.cred import checkers
-from twisted.cred import error, credentials
-from zope import interface
+
+###########################
+# Klasy uwierzytelniajace
+#
+
 class AnyUser:
+    """
+    Uwierzytelnia niezaleznie od podanego loginu i hasla
+    """
+
     interface.implements(checkers.ICredentialsChecker)
 
     credentialInterfaces = (credentials.IUsernamePassword,
         credentials.IUsernameHashedPassword)
 
     def requestAvatarId(self, credentials):
-        return () 
+        return ()
 
+class simpleChecker(checkers.InMemoryUsernamePasswordDatabaseDontUse):
+    """
+    Uwierzytelnia uzytkownikow zgodnie z wpisami w pliku
+    """
+
+    def addUsersFromFile(self, filename):
+        file = open(filename);
+        users = file.readlines()
+        file.close()
+
+        for linia in users:
+            user = linia.split();
+            self.addUser(user[0], user[1])
+
+
+components.registerAdapter(ExampleSession, SSHAvatar, session.ISession)
 components.backwardsCompatImplements(AnyUser)
 
-
+##################################
+# Glowny kod uruchamiajacy serwer
+#
 if __name__ == '__main__':
-    portal = portal.Portal(ExampleRealm())
-    if len(sys.argv) == 2 and sys.argv[1] == '--requirepasswd':
-        passwdDB = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-        addUsersFromFile()
+    parseArgs()
+    LOG = fdopen(3, 'w')
+
+    if locked:
+        checker = simpleChecker()
+        checker.addUsersFromFile(users_filename)
     else:
-        passwdDB = AnyUser()
+        checker = AnyUser()
 
-    portal.registerChecker(passwdDB)
-    portal.registerChecker(InMemoryPublicKeyChecker())
-    ExampleFactory.portal = portal
-
-    factory = ExampleFactory()
+    portal = portal.Portal(SSHRealm())
+    portal.registerChecker(checker)
+    HoneySpySSHFactory.portal = portal
+    factory = HoneySpySSHFactory()
     setattr(factory, 'primes', '')
     protocol = factory.buildProtocol('a');
+
     stdio.StandardIO(protocol);
     reactor.run()
 
