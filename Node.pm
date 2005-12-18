@@ -996,6 +996,7 @@ sub run {
 		$logger->warn('Broken pipe');
 	};
 	$SIG{'CHLD'} = sub {
+		wait();
 		$self->{'processes_spawned'}--
 			if $self->{'processes_spawned'} > 0;
 		my $msg = "Subprocess finished ";
