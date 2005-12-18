@@ -19,6 +19,10 @@
 
 use strict;
 use Switch;
+use IO::Handle;
+
+open(LOG, '>&=3');
+LOG->autoflush(1);
 
 $| = 1;
 
@@ -33,7 +37,7 @@ while(defined($komeda = <STDIN>)) {
 
 	#musi byc poza switchem bo w casie w znakach {} nie widac juz zmiennej $1
 	#czyzby kazdy blok mial wlasna?
-	if( $komeda =~ /^MAIL FROM: *(<.*>)$/i) {
+	if($komeda =~ /^MAIL FROM: *(<.*>)$/i) {
 		print "554 5.7.1 $1 : Sender address rejected:\n";	
 	}
 
@@ -79,6 +83,7 @@ EOF
 
 		else {
 			print "502 5.5.2 Error: command not recognized\n";
+			print LOG "Client run SMTP command: $komeda\n";
 		}
 	}
 }

@@ -104,6 +104,9 @@ sub new {
 			'mode' => '0',
 		},
 
+		# nienazwany potok do slania logow z podprocesow do node'a (in, out)
+		'log_pipe' => undef,
+
 		# Handlery dla zdarzen na uchwytach plikow
 		'r_handlers' => {},
 		'w_handlers' => {},
@@ -465,6 +468,20 @@ sub _connect_to_master {
 	$logger->debug("Using cipher: $cipher");
 
 	$self->_configure_master_connection($master);
+}
+
+sub _setLogPipe {
+	my ($self) = @_;
+	pipe PIPEIN, PIPEOUT;
+	PIPEIN->autoflush(1);
+	PIPEOUT->autoflush(1);
+	$self->{'log_pipe'} = [*PIPEIN, *PIPEOUT];
+	$self->{'r_handlers'}{*PIPEIN} = sub {
+		my $msg = <PIPEIN>;
+		chomp $msg;
+		$logger->info($msg);
+	};
+	$self->_addfh(*PIPEIN, 'r');
 }
 
 sub _removefh {
@@ -912,7 +929,8 @@ sub addService {
 		if (! $pid) {
 			setsid();
 			POSIX::close(3);
-			POSIX::dup(1);
+			close $self->{'log_pipe'}[0];
+			POSIX::dup(fileno($self->{'log_pipe'}[1]));
 			open(STDIN, "<&=".fileno($client));
 			open(STDOUT, ">&=".fileno($client));
 			{ exec($script, @args); }
@@ -1003,6 +1021,8 @@ sub run {
 		$msg .= "(running: ".$self->{'processes_spawned'}."/".$self->{'processes_limit'}.").";
 		$logger->info($msg);
 	};
+
+	$self->_setLogPipe();
 
 	if ($self->{'mode'} eq 'sensor') {
 		if (! $self->{'connected'}) {

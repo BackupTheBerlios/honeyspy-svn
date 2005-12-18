@@ -19,11 +19,18 @@
 
 
 use strict;
+use IO::Handle;
 
 $| = 1;
 
 my $username = <STDIN>;
+exit 0 unless $username;
 chomp $username;
+
+open(LOG, '>&=3');
+LOG->autoflush(1);
+
+print LOG "Finger request for user: $username\n";
 
 print <<EOF;
 

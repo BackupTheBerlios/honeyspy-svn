@@ -19,6 +19,7 @@
 
 use strict;
 use Switch;
+use IO::Handle;
 
 my $komeda;
 my $state = 0;
@@ -26,6 +27,7 @@ my($user, $pass);
 $| = 1;
 
 open(LOG, '>&=3');
+LOG->autoflush(1);
 
 print "+OK POP3 Ready localhost\n";
 
@@ -60,7 +62,6 @@ while(defined($komeda = <STDIN>)) {
 		else {
 			if($state == 1) {
 				print "-ERR use PASS password\n";
-				print LOG 
 			}
 			else {
 				print "-ERR use USER name\n";

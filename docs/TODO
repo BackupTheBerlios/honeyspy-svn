@@ -60,6 +60,10 @@ naprawiæ buga:
 	getServicesList
 	konsola wypisuje fragment logu zamiast liczby
 
+	to jednak nie bug
+	w petli czytania zdarzen w Sensor::read po prostu do konsoli
+	admina trafia log zdarzenia (przekroczenie limitu)
+
 uslugi
 	rozbudowaæ us³ugi [przyjemne, proste]
 	ssh

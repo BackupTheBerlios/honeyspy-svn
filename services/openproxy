@@ -21,11 +21,16 @@
 use strict;
 use POSIX qw(strftime locale_h);
 use Switch;
+use IO::Handle;
 
+open(LOG, '>&=3');
+LOG->autoflush(1);
 $| = 1;
 
 my $line = <STDIN>;
 chomp $line;
+
+print LOG "HTTP request from client: $line\n";
 
 switch ($line) {
 	case m[^GET (.*) HTTP/.\..]  {
