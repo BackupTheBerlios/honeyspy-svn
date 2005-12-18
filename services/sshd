@@ -25,6 +25,7 @@ from twisted.internet import reactor, protocol, defer, stdio
 from twisted.python import log
 from zope.interface import implements
 import sys
+import os
 import re
 log.startLogging(sys.stderr)
 
@@ -35,6 +36,8 @@ def loguj(co):
 def addUsersFromFile():
     plik = open('services/SSHUsers');
     uzytkownicy = plik.readlines()
+    plik.close()
+
     print uzytkownicy
 
     for linia in uzytkownicy:
@@ -85,10 +88,7 @@ class EchoProtocol(protocol.Protocol):
         if data == '\x03' or re.match('^ *exit',self.komeda) or re.match('^ *quit',self.komeda): #^C
             self.transport.write('\r\n');
             self.transport.loseConnection()
-	    try:
-		sys.exit();
-	    except:
-		sys.exc_info();
+            os._exit(0) 
             return
         elif data == '\r':
             data = SymulujPowloke(self.komeda)
