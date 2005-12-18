@@ -27,7 +27,7 @@ from zope.interface import implements
 import sys
 import os
 import re
-log.startLogging(sys.stderr)
+#log.startLogging(sys.stderr)
 
 #jesli uzwasz tego to wylacz logowanie na stderr
 def loguj(co):
