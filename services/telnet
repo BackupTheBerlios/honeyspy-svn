@@ -8,6 +8,14 @@ import sys,os
 def loguj(arg):
     sys.stderr.write(arg)
 
+
+
+
+class TelnetTransport():      # po czym to cholerstwo ma dziedizczyc??
+    def connectionLost(self, reason):
+        Transport.connectionLost(self, reason)
+        os._exit(0);
+
 ######################################
 # This class realize out fake telnet #
 ######################################
@@ -71,9 +79,16 @@ class TelnetFactory(protocol.ServerFactory):
         print "TelnetFactory.getUser"
         return defer.succeed(self.users.get(user, "No such user"))
 
-#application=service.Application('serial')
+
+
+
+
+################
+##### MAIN #####
+################
 
 factory = TelnetFactory()
+#factory.transport = TelnetTransport() 
 
 setattr(factory, 'primes', '')
 protocol = factory.buildProtocol('a');
