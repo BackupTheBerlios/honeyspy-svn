@@ -3,11 +3,14 @@
 from twisted.protocols.telnet import *
 from twisted.application import service,internet
 from twisted.internet import protocol,defer,reactor,stdio
-import sys
+import sys,os
 
 def loguj(arg):
     sys.stderr.write(arg)
 
+######################################
+# This class realize out fake telnet #
+######################################
 class TelnetProtocol(Telnet):
    
     def processChunk(self, chunk):
@@ -68,7 +71,7 @@ class TelnetFactory(protocol.ServerFactory):
         print "TelnetFactory.getUser"
         return defer.succeed(self.users.get(user, "No such user"))
 
-application=service.Application('serial')
+#application=service.Application('serial')
 
 factory = TelnetFactory()
 
