@@ -3,30 +3,44 @@
 from twisted.protocols.telnet import *
 from twisted.application import service,internet
 from twisted.internet import protocol,defer,reactor,stdio
+import sys
+
+def loguj(arg):
+    sys.stderr.write(arg)
+
 class TelnetProtocol(Telnet):
+    
+    def welcomeMessage(self):
+        return "Wellcome to my protected computer\r\n"
+
     def connectionMade(self):
-        print "TelnetProtocol.connectionMade"
         Telnet.connectionMade(self)
 
-    def telnet_Password(self, paswd):
-        """I accept a password as an argument, and check it with the
-            checkUserAndPass method. If the login is successful, I call
-            loggedIn()."""
-        self.write(IAC+WONT+ECHO+"*****\r\n")
-        #try:
-            # checked = self.checkUserAndPass(self.username, paswd)
-        #except:
-            # return "Done"
-        #if not checked:
-            # return "Done"
-        self.loggedIn()
+
+    def telnet_Done(self,line):
+        self.write("Login Failed\r\n");
+        self.write(self.loginPrompt());
+        return "User"        
+
+    def telnet_User(self, user):
+        loguj("Telnet tying to log with username: " + user + "\r\n")
+        self.username = user
+        self.write(IAC+WILL+ECHO+"password: ")
+        return "Password"
+
+    def checkUserAndPass(self,user,paswd):
+        loguj("Telnet trying to log with username and passw: " + user +" "+paswd + "\r\n")
+        return False
+
+    def telnet_Command(self,cmd):
+        self.write("cmd: " + cmd + "\r\n")
         return "Command"
 
+    def dataReceived(self,data):
+        Telnet.dataReceived(self,data)
 
-        def dataReceived(self,data):
-            print "TelnetProtocol.dataReceived"
-            print data
-            Telnet.dataReceived(self,data)
+    def connectionLose(self):
+        sys.stderr.write('jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj\r\n');
 
 class TelnetFactory(protocol.ServerFactory):
     protocol = TelnetProtocol
@@ -35,7 +49,6 @@ class TelnetFactory(protocol.ServerFactory):
 
     def getUser(self, user):
         print "TelnetFactory.getUser"
-        print user
         return defer.succeed(self.users.get(user, "No such user"))
 
 application=service.Application('serial')
