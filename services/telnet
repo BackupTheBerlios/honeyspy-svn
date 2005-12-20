@@ -9,18 +9,37 @@ def loguj(arg):
     sys.stderr.write(arg)
 
 class TelnetProtocol(Telnet):
-    
+   
+    def processChunk(self, chunk):
+        """I take a chunk of data and delegate out to telnet_* methods
+        by way of processLine. If the current mode is 'Done', I'll close
+        the connection. """
+        self.buffer = self.buffer + chunk
+
+        #yech.
+        for delim in self.delimiters:
+            idx = self.buffer.find(delim)
+            if idx != -1:
+                break
+
+        while idx != -1:
+            buf, self.buffer = self.buffer[:idx], self.buffer[idx+2:]
+            self.processLine(buf)
+            if self.mode == 'Done':
+                self.transport.loseConnection()
+                os._exit(0) 
+
+            for delim in self.delimiters:
+                idx = self.buffer.find(delim)
+                if idx != -1:
+                    break
+ 
     def welcomeMessage(self):
         return "Wellcome to my protected computer\r\n"
 
     def connectionMade(self):
         Telnet.connectionMade(self)
 
-
-    def telnet_Done(self,line):
-        self.write("Login Failed\r\n");
-        self.write(self.loginPrompt());
-        return "User"        
 
     def telnet_User(self, user):
         loguj("Telnet tying to log with username: " + user + "\r\n")
@@ -30,7 +49,7 @@ class TelnetProtocol(Telnet):
 
     def checkUserAndPass(self,user,paswd):
         loguj("Telnet trying to log with username and passw: " + user +" "+paswd + "\r\n")
-        return False
+        return None
 
     def telnet_Command(self,cmd):
         self.write("cmd: " + cmd + "\r\n")
@@ -39,8 +58,6 @@ class TelnetProtocol(Telnet):
     def dataReceived(self,data):
         Telnet.dataReceived(self,data)
 
-    def connectionLose(self):
-        sys.stderr.write('jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj\r\n');
 
 class TelnetFactory(protocol.ServerFactory):
     protocol = TelnetProtocol
