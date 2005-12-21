@@ -26,9 +26,11 @@ from twisted.internet import reactor, protocol, defer, stdio
 from twisted.python import log, components
 from zope.interface import implements
 from zope import interface
-from random import randint
-from os import kill, fdopen, fsync, getpid
+from os import fsync 
 import sys, re, getopt
+from os import  getpid
+
+from shell import *
 
 #log.startLogging(sys.stderr)
 
@@ -38,10 +40,6 @@ import sys, re, getopt
 locked = False
 users_filename = 'services/SSHUsers'
 version = 'SSH-1.99-OpenSSH_3.8.1p1 Debian-8.sarge.4'
-uname = 'Linux rocket 2.6.12-gentoo-r10 #2 SMP ' \
-    + 'Sun Sep 25 13:45:33 CEST 2005 i686 AMD Sempron(tm)' \
-    + '2800+ AuthenticAMD GNU/Linux\r\n';
-prompt = '[%(cwd)s]$ '
 
 #####################
 # Klucze serwera SSH
@@ -64,55 +62,6 @@ pSTqy7c3a2AScC/YyOwkDaICHnnD3XyjMwIxALRzl0tQEKMXs6hH8ToUdlLROCrP
 EhQ0wahUTCk1gKA4uPD6TMTChavbh4K63OvbKg==
 -----END RSA PRIVATE KEY-----"""
 
-
-#
-############################################
-# Definicje prostych funkcji komend powloki
-#
-def uptime(shell, args):
-    return ' %d:%d:%d up  %d days, %d users,   load average: %d.00, %d.00, %d.00\r\n' \
-        % (randint(0,23), randint(0,60), randint(0,60), randint(0,100), \
-                randint(0,30), randint(0,30), randint(0,30), randint(0,30));
-
-def exit(shell, args):
-    kill(0, 9)
-
-def cd(shell, args):
-    if len(args) > 1:
-        shell.cwd = args[1]
-    else:
-        shell.cwd = '~'
-    return ''
-
-def echo(shell, args):
-    return ' '.join(args[1:]) + '\r\n'
-
-def pwd(shell, args):
-    return shell.cwd + '\r\n'
-
-commands = {
-    'ls'     : 'ls dziala\r\n',
-    'wget'   : 'wget: brąkujacy URL\r\nUżycie: wget [OPCJE]... [URL]...\
-                \r\nPolecenie `wget --help wyświetli więcej opcji.\r\n',
-    'uptime' : uptime,
-    'uname'  : uname,
-    'exit'   : exit,
-    'cd'     : cd,
-    'logout' : exit,
-    'echo'   : echo,
-    'pwd'    : pwd,
-    ''       : '',
-}
-
-
-
-# Funkcja uzywana do logowania danych do HoneySpy'a
-#
-def logData(msg):
-    LOG.write('['+str(getpid())+'] SSH command: ' + msg + '\r\n')
-    LOG.flush()
-
-#
 # Ustawienie opcji zgodnie z argumetnami wywolania
 #
 def parseArgs():
@@ -138,47 +87,6 @@ def parseArgs():
             commands['uname'] = arg + '\r\n'
 
 
-class ShellSimulationProtocol(protocol.Protocol):
-    def __init__(self):
-        self.cmdline = ''
-        self.cwd = '/tmp'
-        self.prompt = prompt
-
-    def executeCommand(self, cmdline):
-        logData(cmdline)
-
-        global commands
-        tokens = cmdline.split()
-        if len(tokens) == 0:
-            tokens = ['']
-        if tokens[0] in commands:
-            result = commands[tokens[0]]
-            if type(result) == type(''):
-                data = result
-            else:
-                data = result(self, tokens)
-        else:
-            data = 'bash: '+tokens[0]+': command not found\r\n'
-        return data;
-
-    def printPrompt(self):
-        self.transport.write(prompt % {'cwd':self.cwd});
-
-    def connectionMade(self):
-        self.printPrompt()
-
-    def dataReceived(self, data):
-        if data == '\x03': #^C
-            self.executeCommand('exit')
-        elif data == '\r':
-            data = self.executeCommand(self.cmdline)
-            self.transport.write('\r\n' + data)
-            self.printPrompt()
-            self.cmdline = ""
-        else:
-             self.cmdline += data
-             self.transport.write(data)
-
 #############################################################
 # Klasy realizujace rozne aspekty polaczenia protokolu SSH
 #
@@ -199,9 +107,9 @@ class ExampleSession:
     def getPty(self, term, windowSize, attrs):
         pass
     def execCommand(self, proto, cmd):
-        kill(0, 9)
+        os._exit(0)
     def openShell(self, trans):
-        ep = ShellSimulationProtocol()
+        ep = ShellSimulationProtocol(os.getpid())
         ep.makeConnection(trans)
         trans.makeConnection(session.wrapProtocol(ep))
     def eofReceived(self):
@@ -215,7 +123,7 @@ class SSHServerTransportVersion(SSHServerTransport):
         return
     def connectionLost(self, reason):
         SSHServerTransport.connectionLost(self, reason)
-        kill(0, 9)
+        os._exit(0)
 
 class HoneySpySSHFactory(factory.SSHFactory):
     publicKeys = {
@@ -279,7 +187,6 @@ components.backwardsCompatImplements(AnyUser)
 #
 if __name__ == '__main__':
     parseArgs()
-    LOG = fdopen(3, 'w')
 
     if locked:
         checker = passwdDBFromFile()
