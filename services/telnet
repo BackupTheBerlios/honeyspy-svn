@@ -16,6 +16,28 @@ class MyTelnetTransport(TelnetTransport):      # po czym to cholerstwo ma dziedi
         Transport.connectionLost(self, reason)
         os._exit(0);
 
+
+
+class passwdDBFromFile:
+    """
+    Uwierzytelnia uzytkownikow zgodnie z wpisami w pliku
+    """
+    users = {} #przechowuje wpisy user haslo
+
+    def addUser(self,user,passwd):
+        pass
+
+    def addUsersFromFile(self, filename):
+        file = open(filename);
+        users = file.readlines()
+        file.close()
+
+        for linia in users:
+            user = linia.split();
+            self.addUser(user[0], user[1])
+
+
+
 ######################################
 # This class realize out fake telnet #
 ######################################

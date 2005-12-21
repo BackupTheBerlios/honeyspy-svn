@@ -3,6 +3,11 @@ from random import randint
 from os import  fdopen, fsync, getpid,kill
 import os
 
+### Import Polish locale ###
+import locale
+locale.setlocale(locale.LC_ALL, 'polish')
+############################
+
 uname = 'Linux rocket 2.6.12-gentoo-r10 #2 SMP ' \
     + 'Sun Sep 25 13:45:33 CEST 2005 i686 AMD Sempron(tm)' \
     + '2800+ AuthenticAMD GNU/Linux\r\n';
