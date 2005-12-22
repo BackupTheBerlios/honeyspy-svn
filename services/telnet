@@ -3,11 +3,12 @@
 from twisted.protocols.telnet import *
 from twisted.application import service,internet
 from twisted.internet import protocol,defer,reactor,stdio
+from shell import *
 import sys,os
+
 
 def loguj(arg):
     sys.stderr.write(arg)
-
 
 
 from twisted.conch.telnet import TelnetTransport
@@ -23,12 +24,9 @@ class passwdDBFromFile:
     Uwierzytelnia uzytkownikow zgodnie z wpisami w pliku
     """
     users = {} #przechowuje wpisy user haslo
-
-    def addUser(self,user,passwd):
-        pass
-
-    def addUsersFromFile(self, filename):
-        file = open(filename);
+    
+    def __init__(self,path):
+        file = open(path);
         users = file.readlines()
         file.close()
 
@@ -36,13 +34,39 @@ class passwdDBFromFile:
             user = linia.split();
             self.addUser(user[0], user[1])
 
+    def checkPasswd(self,user,passwd):
+        if not self.users.has_key(user):
+            return False
+        else:
+            if self.users[user] == passwd:
+                return True
+            else: 
+                return False
+
+    def addUser(self,user,passwd):
+        self.users[user] = passwd  
 
 
 ######################################
 # This class realize out fake telnet #
 ######################################
 class TelnetProtocol(Telnet):
+
+    fakeShell = None
    
+    def initShell(self):
+        self.fakeShell = ShellSimulationProtocol(os.getpid()); 
+
+    def checkUserAndPass(self,user,paswd):
+        loguj("Telnet trying to log with username and passw: " + user +" "+paswd + "\r\n")
+        if  usersDB.checkPasswd(user,paswd):
+            self.initShell()
+            self.write(self.fakeShell.returnPrompt())
+            return True
+        else:
+            sys.stderr.write('warunek false\r\n')
+            return False
+
     def processChunk(self, chunk):
         """I take a chunk of data and delegate out to telnet_* methods
         by way of processLine. If the current mode is 'Done', I'll close
@@ -80,12 +104,10 @@ class TelnetProtocol(Telnet):
         self.write(IAC+WILL+ECHO+"password: ")
         return "Password"
 
-    def checkUserAndPass(self,user,paswd):
-        loguj("Telnet trying to log with username and passw: " + user +" "+paswd + "\r\n")
-        return None
-
     def telnet_Command(self,cmd):
-        self.write("cmd: " + cmd + "\r\n")
+        data = self.fakeShell.executeCommand(cmd)
+        self.write(data + self.fakeShell.returnPrompt())
+        self.fakeShell.zeroCommand()
         return "Command"
 
     def dataReceived(self,data):
@@ -103,17 +125,17 @@ class TelnetFactory(protocol.ServerFactory):
 
 
 
-
-
 ################
 ##### MAIN #####
 ################
 
+usersDB = passwdDBFromFile('services/SSHUsers')
 factory = TelnetFactory()
 
 setattr(factory, 'primes', '')
 protocol = factory.buildProtocol('a');
 protocol.transport = TelnetTransport() 
+
 
 stdio.StandardIO(protocol);
 

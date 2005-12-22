@@ -2,6 +2,7 @@ from twisted.internet import protocol
 from random import randint
 from os import  fdopen, fsync, getpid,kill
 import os
+import sys
 
 ### Import Polish locale ###
 import locale
@@ -79,7 +80,6 @@ class ShellSimulationProtocol(protocol.Protocol):
 
     def executeCommand(self, cmdline):
         self.logData(cmdline)
-
         global commands
         tokens = cmdline.split()
         if len(tokens) == 0:
@@ -96,10 +96,16 @@ class ShellSimulationProtocol(protocol.Protocol):
 
     def printPrompt(self):
         self.transport.write(prompt % {'cwd':self.cwd});
+    
+    def returnPrompt(self):
+        return prompt % {'cwd':self.cwd} 
 
     def connectionMade(self):
         self.printPrompt()
-
+    
+    def zeroCommand(self):
+        self.cmdline = ""
+       
     def dataReceived(self, data):
         if data == '\x03': #^C
             self.executeCommand('exit')
@@ -107,7 +113,7 @@ class ShellSimulationProtocol(protocol.Protocol):
             data = self.executeCommand(self.cmdline)
             self.transport.write('\r\n' + data)
             self.printPrompt()
-            self.cmdline = ""
+            self.zeroCommand()
         else:
              self.cmdline += data
              self.transport.write(data)
