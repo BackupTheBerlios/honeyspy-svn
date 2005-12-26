@@ -220,13 +220,21 @@ A lot of, probably.
 
 =head1 AUTHORS
 
- Robert Nowotniak <robert at nowotniak.com>
- Michal Wysokinski <wolk at o2.pl>
+This software is written by Robert Nowotniak and Michal Wysokinski.
+
+=head1 COPYRIGHT
+
+ Copyright (C) 2005   Robert Nowotniak <robert at nowotniak.com>
+ Copyright (C) 2005   Michal Wysokinski <wolk at o2.pl>
+
+This is free software; see the source for copying conditions.
+There is NO waranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
 
 =head1 SEE ALSO
 
 arptables(8), ebtables(8), tcpdump(8), p0f(1), inetd(8),
-Log::Log4perl(3pm), Log::Log4perl::Config, Log::Log4perl::Appender
+Log::Log4perl(3pm), Log::Log4perl::Config(3pm), Log::Log4perl::Appender(3pm)
 
 =cut
 
