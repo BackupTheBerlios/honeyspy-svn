@@ -22,6 +22,7 @@ use strict;
 
 use Log::Log4perl (':easy');
 use Getopt::Long;
+use POSIX ('setsid');
 use Master;
 use Node;
 
@@ -41,19 +42,25 @@ sub usage {
 	print "\n";
 
 	print "Usage:\n";
-	print "   $0 [-h|--help] [-m|--master] -c|--config <config_file>\n\n";
+	print "   $0 <OPTIONS>\n\n";
+	print "   Options are:\n";
+	print "       -c|--config <config_file>\n";
+	print "      [-f|--foreground]\n";
+	print "      [-h|--help]\n";
+	print "      [-m|--master]\n\n";
 	exit $exitcode;
 }
 
 Log::Log4perl::init('log4perl.conf');
 
 
-my($master_mode, $config, $help);
+my($master_mode, $config, $help, $foreground);
 
 if (!GetOptions(
 	'master|m'   => \$master_mode,
 	'help|h'     => \$help,
 	'config|c=s' => \$config,
+	'foreground|f' => \$foreground,
 )) {
 	usage(1); 
 }
@@ -69,5 +76,157 @@ if ($help) {
 my $node = $master_mode ?
 	Master->new($config) : Node->new($config);
 
+if (!$foreground) {
+	fork and exit 0;
+	fork and exit 0;
+	setsid();
+	close STDIN;
+	close STDOUT;
+	close STDERR;
+	open STDIN, '</dev/null';
+	open STDOUT, '>/dev/null';
+	open STDERR, '>/dev/null';
+}
+
 $node->run();
+
+exit 0;
+
+=head1 NAME
+
+honeyspy - advaned honeypot environment
+
+=head1 SYNOPSIS
+
+honeyspy [-h|--help] [-f|--foreground] [-m|--master] -c|--config <config_file>
+
+=head1 DESCRIPTION
+
+HoneySpy is a collection of tools and scripts, which allows you to create,
+setup, maintain and monitor the network of honeypot servers. It's written in
+general in Perl.
+
+By using tools such as p0f, ebtables, ippersonality and others on network nodes
+it allows you to simulate various operating system's TCP/IP stack, and
+detecting it on the remote hosts at the same time.
+
+Mangling MAC addresses of used IP aliases is possible as well (to prevent
+detection of honeypots by the attackers, who compared MAC addresses in the
+network).
+
+=head1 OPTIONS
+
+=over
+
+=item -c, --config <config_file>
+
+config file
+
+=item -f, --foreground
+
+run in foreground. helpful for debugging.
+
+=item -h, --help
+
+show help
+
+=item -m, --master
+
+master node mode
+
+=back
+
+=head1 FILES
+
+=head2 CONFIGURATION FILE
+
+Node configuration file is simple Perl script,
+which is included during node startup by
+
+ do <config_file>,
+
+as recommended in Tom Christiansen FMTEYEWTK.
+
+It should contain lexical scoped (my) $config reference
+to hash with following keys:
+
+=over
+
+=item name
+
+Node's name
+
+=item ca_file
+
+Network CA's certificate filename
+
+=item ssl_key
+
+Node's private key filename
+
+=item ssl_cert
+
+Node's certificate filename
+
+=item listen_addr
+(Master node only)
+
+IP address to listen for sensors
+
+=item listen_port
+(Master node only)
+
+Port number for listening
+
+=item master_addr
+(Slave node only)
+
+Address of Master node
+
+=item master_addr
+
+Port number on Master node
+
+=back
+
+
+=head2 CONFIGURATION FILE EXAMPLES
+
+=head3 Master node config file
+
+ my $config = {
+	 'name'         => 'master',
+	 'listen_addr'  => '0.0.0.0',
+	 'listen_port'  => '9000',
+	 'ca_file'      => 'certs/master-cert.pem',
+	 'ssl_key'      => 'certs/master-key.pem',
+	 'ssl_cert'     => 'certs/master-cert.pem',
+ };
+
+=head3 Slave node config file
+
+ my $config = {
+ 	'name'         => 'master',
+ 	'master_addr'	=> '192.168.1.1',
+ 	'master_port'	=> '9000',
+ 	'ca_file'      => 'certs/master-cert.pem',
+ 	'ssl_key'      => 'certs/master-key.pem',
+ 	'ssl_cert'     => 'certs/master-cert.pem',
+ };
+
+=head1 BUGS
+
+A lot of, probably.
+
+=head1 AUTHORS
+
+ Robert Nowotniak <robert at nowotniak.com>
+ Michal Wysokinski <wolk at o2.pl>
+
+=head1 SEE ALSO
+
+arptables(8), ebtables(8), tcpdump(8), p0f(1), inetd(8),
+Log::Log4perl(3pm), Log::Log4perl::Config, Log::Log4perl::Appender
+
+=cut
 

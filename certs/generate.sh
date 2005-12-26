@@ -35,6 +35,8 @@ readkey() {
 	[ $yn = y ];
 }
 
+echo -n '' > demoCA/index.txt
+
 if [ "$1" = 'clean' ]; then
 	if readkey 'Delete ALL keys and certificates?'; then
 		rm *.enc *.pem *.csr && echo "Done";
