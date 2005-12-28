@@ -5,10 +5,14 @@ use Log::Log4perl;
 
 package subsystems::p0f;
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('p0f');
+
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing p0f subsystem");
 
 	$self->{'p0f_pid'} = undef,
 	$self->{'p0f_fh'} = undef,

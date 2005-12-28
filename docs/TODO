@@ -1,3 +1,14 @@
+Nale¿a³oby wyodrêbniæ wszystkie podsystemy,
+	a Node dziedziczy³by z nich wszystkich:
+		p0f
+			enableP0f
+			disableP0f
+			setP0fOption
+		pcap
+		mac
+		fingerprint
+		services
+
 Skrypt wspolny dla modulow uslug
 	wyszukujacy ciagow ktore oznaczaja ataki (shellcody, %s itp)
 	z interfejsem do logowania

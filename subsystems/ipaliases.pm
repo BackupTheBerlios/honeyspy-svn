@@ -5,10 +5,14 @@ use Log::Log4perl;
 
 package subsystems::ipaliases;
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('ipaliases');
+
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing IP aliases subsystem");
 	
 	$self->{'ip_aliases'} = {};
 

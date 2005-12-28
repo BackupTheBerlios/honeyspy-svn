@@ -6,10 +6,14 @@ use Net::Pcap;
 
 package subsystems::pcap;
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('pcap');
+
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing pcap subsystem");
 
 	$self->{'pcap'} = undef,
 	$self->{'pcap_filters'} = [],

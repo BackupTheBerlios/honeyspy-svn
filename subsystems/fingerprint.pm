@@ -7,10 +7,13 @@ package subsystems::fingerprint;
 
 use constant FINGERPRINTS_DIR => "fingerprints/";
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('fingerprint');
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing fingerprint subsystem");
 
 	$self->{'fingerprints'} = {};
 	

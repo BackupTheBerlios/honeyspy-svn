@@ -5,10 +5,14 @@ use Log::Log4perl;
 
 package subsystems::mac;
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('mac');
+
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing MAC spoofing subsystem");
 
 	$self->{'spoofed_mac'} = {};
 }

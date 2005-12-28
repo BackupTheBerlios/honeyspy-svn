@@ -5,10 +5,14 @@ use Log::Log4perl;
 
 package subsystems::superserver;
 
-my $logger = Log::Log4perl->get_logger();
+Log::Log4perl::init('log4perl.conf');
+my $logger = Log::Log4perl->get_logger('superserver');
+
 
 sub init {
 	my ($self) = @_;
+
+	$logger->debug("Initializing superserver subsystem");
 
 	$self->{'ports'} = {};  # dzialajace uslugi
 							 	 	# "addr/proto/port" ->

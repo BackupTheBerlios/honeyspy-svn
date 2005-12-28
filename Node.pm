@@ -397,7 +397,6 @@ sub DESTROY {
 }
 
 
-
 ######################################################
 # G³ówna pêtla serwera (obs³uga zdarzeñ na gniazdach)
 #

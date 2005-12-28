@@ -121,7 +121,7 @@ while (defined($_ = $term->readline($prompt))) {
 	$s->doOnReturn(sub {
 			my ($self, @res) = @_;
 			local $" = "\n   -> ";
-			print "@res\n";
+			print "@res\n" if @res && $res[0];
 		});
 	$s->call($cmd, 1, @args);
 	$s->read('return_code');
