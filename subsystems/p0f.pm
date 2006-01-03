@@ -55,7 +55,9 @@ sub enableP0f {
 		$args .= '-A ' if $mode == 1;
 		$args .= '-R ' if $mode == 2;
 
-		my $pid = open2($rdfh, $wrfh, "exec p0f -q -l $args 2>&1");
+		use IPC::Open2;
+		my $pid = open2($rdfh, $wrfh, "p0f -q -l $args 2>&1");
+
 		$self->{'p0f_pid'} = $pid;
 		$self->{'p0f_fh'} = $rdfh;
 		$self->_addfh($rdfh, 'r');
@@ -64,8 +66,8 @@ sub enableP0f {
 		};
 	};
 	for ($@) {
-		if (/^open2:/) {
-			my $msg = 'Couldn\'t start p0f';
+		if ($_) {
+			my $msg = "Couldn't start p0f: $_";
 			$logger->error($msg);
 			return $msg;
 		}

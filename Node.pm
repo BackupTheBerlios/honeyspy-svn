@@ -172,7 +172,7 @@ sub _callFunction {
 	for ($@) {
 		last unless ($@);
 
-		if (/Undefined subroutine/) {
+		if (/Can't locate object method/) {
 			$result[0] = "No such function ($function) on remote side";
 			last;
 		}
