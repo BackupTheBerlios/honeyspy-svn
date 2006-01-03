@@ -188,7 +188,7 @@ sub sendToPeer {
 	my ($self) = shift;
 	my $sock = $self->{'socket'};
 
-	return Commons::sendDataToSocket($sock, @_);
+	return Commons::sendDataToSocket($sock, [@_]);
 }
 
 

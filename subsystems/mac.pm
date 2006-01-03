@@ -77,8 +77,10 @@ sub delMAC {
 sub getMAC {
 	my ($self, $ip) = @_;
 
+	my %macs = %{$self->{'spoofed_mac'}};
+
 	return $self->{'spoofed_mac'}{$ip} if defined $ip;
-	return %{$self->{'spoofed_mac'}};
+	return %macs;
 }
 
 # usuwa wszystkie odwzorowania adres -> mac

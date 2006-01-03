@@ -183,18 +183,17 @@ sub _callFunction {
 		$logger->error($result[0]);
 	}
 
-	if (defined($result[0])) {
+	my $undef_returned = scalar @result == 1 && !defined($result[0]);
+	if (! $undef_returned) {
 		my $master_sock = $self->{'master_sock'};
 		$self->{'w_handlers'}{$master_sock} = sub {
-			Commons::sendDataToSocket($master_sock, 'ret', @result);
+			Commons::sendDataToSocket($master_sock, ['ret', @result]);
 			$self->_removefh($master_sock, 'w');
 		};
 		$self->_addfh($master_sock, 'w');
 	}
 
 	return 0;
-
-	return @result;
 }
 
 sub _configure_master_connection {
@@ -546,7 +545,7 @@ sub runOnNode {
 				$logger->info(@ret);
 				$node->{'w_handlers'}{$node->{'master_sock'}} = sub {
 					Commons::sendDataToSocket(
-						$node->{'master_sock'}, 'ret', @ret);
+						$node->{'master_sock'}, ['ret', @ret]);
 					$node->_removefh($node->{'master_sock'}, 'w');
 				};
 				$node->_addfh($node->{'master_sock'}, 'w');

@@ -57,7 +57,7 @@ tie *SOCK, 'trapper';
 		"\x63\x72\x69\x70\x74\x0a\x02\x2d\x61"
 );
 foreach my $data (keys %DATA) {
-	Commons::sendDataToSocket(*SOCK, split(/ /,$data));
+	Commons::sendDataToSocket(*SOCK, [split(/ /,$data)]);
 	my $a = join('', <SOCK>);
 	my $result =  ($a eq $DATA{$data});
 	ok($result, 'Commons::sendDataToSocket');

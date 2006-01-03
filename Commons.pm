@@ -37,7 +37,7 @@ my $logger = get_logger();
 #
 sub sendDataToSocket {
 	eval {
-		my ($sock, $serialized) = (shift, freeze [@_]);
+		my ($sock, $serialized) = ($_[0], freeze $_[1]);
 		print $sock pack('N', length($serialized));
 		print $sock $serialized;
 	};

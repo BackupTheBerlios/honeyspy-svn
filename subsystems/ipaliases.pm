@@ -79,7 +79,9 @@ sub delIPAlias {
 sub getIPAlias {
 	my ($self, $ip) = @_;
 
-	return %{$self->{'ip_aliases'}} unless defined $ip;
+	my %aliases = %{$self->{'ip_aliases'}};
+
+	return %aliases unless defined $ip;
 	return $self->{'ip_aliases'}{$ip};
 }
 
