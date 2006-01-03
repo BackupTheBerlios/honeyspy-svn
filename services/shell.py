@@ -42,8 +42,7 @@ def pwd(shell, args):
 
 commands = {
     'ls'     : 'ls dziala\r\n',
-    'wget'   : 'wget: brąkujacy URL\r\nUżycie: wget [OPCJE]... [URL]...\
-                \r\nPolecenie `wget --help wyświetli więcej opcji.\r\n',
+    'wget'   : 'wget: b',
     'uptime' : uptime,
     'uname'  : uname,
     'exit'   : exit,

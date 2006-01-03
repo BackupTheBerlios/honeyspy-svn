@@ -2,6 +2,7 @@
 
 use strict;
 use Log::Log4perl;
+use POSIX qw(setsid);
 
 package subsystems::superserver;
 
@@ -69,7 +70,7 @@ sub addService {
 
 		my $pid = fork();
 		if (! $pid) {
-			setsid();
+			POSIX::setsid();
 			POSIX::close(3);
 			close $self->{'log_pipe'}[0];
 			POSIX::dup(fileno($self->{'log_pipe'}[1]));

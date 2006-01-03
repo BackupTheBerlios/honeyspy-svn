@@ -162,12 +162,11 @@ sub _callFunction {
 
 	eval {
 		no strict 'refs';
-		unshift(@args, $self);
 		if ($arrayctx) {
-			@result = @{[&{*{$function}}(@args)]};
+			@result = @{[ $self->$function(@args) ]};
 		}
 		else {
-			@result = (scalar &{*{$function}}(@args));
+			@result = (scalar $self->$function(@args));
 		}
 	};
 	for ($@) {

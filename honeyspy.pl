@@ -183,7 +183,8 @@ Port number for listening
 
 Address of Master node
 
-=item master_addr
+=item master_port
+(Slave node only)
 
 Port number on Master node
 
