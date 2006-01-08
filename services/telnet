@@ -99,7 +99,7 @@ class TelnetProtocol(Telnet):
 
 
     def telnet_User(self, user):
-        loguj("Telnet tying to log with username: " + user + "\r\n")
+        loguj("Telnet trying to log with username: " + user + "\r\n")
         self.username = user
         self.write(IAC+WILL+ECHO+"password: ")
         return "Password"

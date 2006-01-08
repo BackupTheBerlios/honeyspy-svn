@@ -6,7 +6,7 @@ use POSIX qw(setsid);
 
 package subsystems::superserver;
 
-Log::Log4perl::init('log4perl.conf');
+Log::Log4perl::init('/home/rob/HoneySpy-svn/log4perl.conf');
 my $logger = Log::Log4perl->get_logger('superserver');
 
 
@@ -61,9 +61,8 @@ sub addService {
 			$logger->error("Couldn't accept connection ($!)");
 			return 1;
 		}
-		$logger->info("Connection to service $script from " . $client->peerhost);
 		if ($self->{'processes_spawned'} >= $self->{'processes_limit'}) {
-			$logger->error("Maximum processes already running. Dropping connection");
+			$logger->error("Maximum processes already running. Dropping connection from " . $client->peerhost);
 			close $client;
 			return 1;
 		}
@@ -80,6 +79,8 @@ sub addService {
 			$logger->error("Couldn't run script ($!)");
 			exit 1;
 		}
+		$logger->info("Connection to service $script from " . $client->peerhost .
+			"[pid: ".$pid."]");
 		$self->{'processes_spawned'}++;
 	};
 

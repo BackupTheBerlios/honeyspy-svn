@@ -39,7 +39,7 @@ from shell import *
 #
 locked = False
 users_filename = 'services/SSHUsers'
-version = 'SSH-1.99-OpenSSH_3.8.1p1 Debian-8.sarge.4'
+version = 'SSH-2.0-OpenSSH_3.5p1 FreeBSD-20050924'
 
 #####################
 # Klucze serwera SSH

