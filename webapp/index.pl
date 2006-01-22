@@ -18,9 +18,25 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 use strict;
-use constant DIR => '/home/rob/HoneySpy-svn/webapp/'; # XXX
-use constant CERTDIR => '/home/rob/HoneySpy-svn/certs/'; # XXX
+
+################################################################################
+# USTAW TU PRAWIDLOWE, DLA TWOJEGO SYSTEMU, SCIEZKI
+################################################################################
+
+use constant DIR => '/home/rob/HoneySpy-svn/webapp/';
+use constant CERTDIR => '/home/rob/HoneySpy-svn/certs/';
 use lib DIR . '../';
+
+################################################################################
+
+
+
+BEGIN {
+	if (!$ENV{'LOG4PERLCONF'}) {
+		$ENV{'LOG4PERLCONF'} = DIR . '/../log4perl.conf';
+	}
+}
+
 
 use Template;
 use Template::Constants qw(:debug);
@@ -95,13 +111,17 @@ else {
 
 		my @ipaliases = keys (%ipaliases);
 
-		my $vars =  {
+		my $vars = {
 			'name' => $name,
 			'abilities' => \@abilities,
 			'ipaliases' => \@ipaliases,
 			'macs' => \%macs,
 			'filters' => \@filters,
 			'services' => \%services,
+			'server' => $cgi->param('server'),
+			'password' => $cgi->param('pass'),
+			'result' => '',
+			'command' => $cgi->param('command'),
 		};
 
 		if (0) {
@@ -117,6 +137,15 @@ else {
 			print STDERR "\n";
 			print STDERR %services;
 			print STDERR "\n";
+		}
+
+		my ($command, @args) = split(/\s+/, $cgi->param('command'));
+		if ($command) {
+			print STDERR "-> $command";
+
+			[$sensor->$command(@args)];
+			$sensor->read('return_code');
+			$vars->{'result'} = join("\n<br/>", @val);
 		}
 
 		$tt->process('templates/main.html', $vars);

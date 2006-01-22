@@ -61,6 +61,71 @@
 			</tr>
 		</table>
 
+		<br/>
+
+		[% IF command %]
+
+		<table id="command_result">
+			<tr><td class="first_cell">Command result:</td></tr>
+			<tr><td>[% result %]</td></tr>
+		</table>
+		<br/>
+
+		[% END %]
+
+		<form method="post" action=".">
+			<textarea cols="70" lines="3" name="command">[% command %]</textarea><br/>
+			<input type="submit" name="submit" value="Execute"/>
+			<input type="reset" value="Reset"/>
+			<input type="hidden" name="server" value="[% server %]"/>
+			<input type="hidden" name="pass" value="[% password %]"/>
+		</form>
+
+		Available commands:
+		<ul>
+
+			<li>getAbilities
+			</li>
+			<li>addService &lt;address&gt; &lt;proto&gt; &lt;port&gt; &lt;script&gt; [&lt;args&gt;]
+			</li>
+
+			<li>delService &lt;address&gt; &lt;proto&gt; &lt;port&gt;
+			</li>
+			<li>enableP0f
+			</li>
+			<li>disableP0f
+			</li>
+			<li>addFilter &lt;filter_rule&gt;
+
+			</li>
+			<li>delFilter &lt;rule_number&gt;
+			</li>
+			<li>replaceFilters &lt;replace_filter&gt;
+			</li>
+			<li>getFilter
+			</li>
+
+			<li>getFilters
+			</li>
+			<li>setMAC &lt;address&gt; &lt;MAC&gt;
+			</li>
+			<li>getMAC [&lt;address&gt;]
+			</li>
+			<li>cleanMAC
+			</li>
+
+			<li>setFingerprint &lt;address&gt; &lt;os_identifier&gt;
+			</li>
+			<li>delFingerprint &lt;address&gt;
+			</li>
+			<li>addIPAlias &lt;address&gt;
+
+			</li>
+			<li>delIPAlias &lt;address&gt;
+			</li>
+
+		</ul>
+
 	</body>
 </html>
 
