@@ -27,6 +27,7 @@ from twisted.python import log, components
 from zope.interface import implements
 from zope import interface
 from os import fsync 
+from os import fdopen
 import sys, re, getopt
 from os import  getpid
 
@@ -110,6 +111,7 @@ class ExampleSession:
         os._exit(0)
     def openShell(self, trans):
         ep = ShellSimulationProtocol(os.getpid())
+        ep.log('Connection attempt: ' + username + '/' + password);
         ep.makeConnection(trans)
         trans.makeConnection(session.wrapProtocol(ep))
     def eofReceived(self):
@@ -162,6 +164,10 @@ class AnyUser:
         credentials.IUsernameHashedPassword)
 
     def requestAvatarId(self, credentials):
+        global username
+        global password
+        username = credentials.username
+        password = credentials.password
         return ()
 
 class passwdDBFromFile(checkers.InMemoryUsernamePasswordDatabaseDontUse):
@@ -177,6 +183,11 @@ class passwdDBFromFile(checkers.InMemoryUsernamePasswordDatabaseDontUse):
         for linia in users:
             user = linia.split();
             self.addUser(user[0], user[1])
+
+    def requestAvatarId(self, credentials):
+        global username
+        global password
+        return checkers.InMemoryUsernamePasswordDatabaseDontUse.requestAvatarId(self, credentials)
 
 
 components.registerAdapter(ExampleSession, SSHAvatar, session.ISession)

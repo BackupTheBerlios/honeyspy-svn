@@ -204,12 +204,16 @@ class ShellSimulationProtocol(protocol.Protocol):
     def getParentPID(self):
         return self.parentPID
 
-    def logData(self,msg):
+    def log(self, msg):
+        self.LOG.write('['+str(getpid())+'] ' + msg + '\r\n')
+        self.LOG.flush()
+
+    def logCommand(self,msg):
         self.LOG.write('['+str(getpid())+'] command: ' + msg + '\r\n')
         self.LOG.flush()
 
     def executeCommand(self, cmdline):
-        self.logData(cmdline)
+        self.logCommand(cmdline)
         global commands
         tokens = cmdline.split()
         if len(tokens) == 0:

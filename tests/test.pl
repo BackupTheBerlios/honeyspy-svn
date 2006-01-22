@@ -2,6 +2,12 @@
 
 use strict;
 
+BEGIN {
+	if (!$ENV{'LOG4PERLCONF'}) {
+		$ENV{'LOG4PERLCONF'} = '../log4perl.conf';
+	}
+}
+
 use Test::Harness;
 
 my @TEST_FILES = qw(

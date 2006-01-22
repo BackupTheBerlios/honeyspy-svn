@@ -20,6 +20,12 @@
 
 use strict;
 
+BEGIN {
+	if (!$ENV{'LOG4PERLCONF'}) {
+		$ENV{'LOG4PERLCONF'} = 'log4perl.conf';
+	}
+}
+
 use Sensor;
 use IO::Socket::SSL;
 use Term::ReadLine;
