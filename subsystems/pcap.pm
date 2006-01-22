@@ -6,7 +6,7 @@ use Net::Pcap;
 
 package subsystems::pcap;
 
-Log::Log4perl::init('/home/rob/HoneySpy-svn/log4perl.conf');
+Log::Log4perl::init($ENV{'LOG4PERLCONF'});
 my $logger = Log::Log4perl->get_logger('pcap');
 
 

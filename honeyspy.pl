@@ -20,6 +20,12 @@
 
 use strict;
 
+BEGIN {
+	if (!$ENV{'LOG4PERLCONF'}) {
+		$ENV{'LOG4PERLCONF'} = 'log4perl.conf';
+	}
+}
+
 use Log::Log4perl (':easy');
 use Getopt::Long;
 use POSIX ('setsid');
@@ -51,7 +57,7 @@ sub usage {
 	exit $exitcode;
 }
 
-Log::Log4perl::init('/home/rob/HoneySpy-svn/log4perl.conf');
+Log::Log4perl::init($ENV{'LOG4PERLCONF'});
 
 
 my($master_mode, $config, $help, $foreground);

@@ -1,0 +1,13 @@
+table.sensor_table {
+	border: 1px solid black;
+}
+
+table.sensor_table td {
+	vertical-align: top;
+}
+
+table.sensor_table table {
+	border-collapse: collapse;
+	border: 1px solid black;
+}
+

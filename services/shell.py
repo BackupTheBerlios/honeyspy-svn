@@ -20,7 +20,7 @@
 
 #
 # XXX
-# THIS CODE NEEDS REFACTORING OR NEEDS TO BE REWRITTEN
+# THIS CODE NEEDS SERIOUS REFACTORING OR NEEDS TO BE REWRITTEN
 #
 
 from twisted.internet import protocol
@@ -83,8 +83,7 @@ Usage: wget [OPTION]... [URL]...\r
     
 def ls(shell, args):
     if shell.cwd == '/':
-        return """
-drwxr-xr-x   2 root  wheel  1024  1 sty 14:59 bin/\r
+        return """drwxr-xr-x   2 root  wheel  1024  1 sty 14:59 bin/\r
 drwxr-xr-x   5 root  wheel   512  1 sty 23:05 boot/\r
 drwxr-xr-x   2 root  wheel   512 29 gru 18:56 cdrom/\r
 lrwxr-xr-x   1 root  wheel    10 29 gru 19:06 compat@ -> usr/compat\r
@@ -106,8 +105,7 @@ drwxr-xr-x  38 root  wheel  1024 31 gru 12:19 usr/\r
 lrwxr-xr-x   1 root  wheel     7 31 gru 12:18 var@ -> usr/var\r
 """
     else:
-        return """
-total 8\r
+        return """total 8\r
 drwx------  2 rob  rob  4096 Jan  8 23:17 .\r
 drwxrwxrwt  6 root root 4096 Jan  8 23:17 ..\r
 """
@@ -122,6 +120,13 @@ commands = {
     'logout' : exit,
     'echo'   : echo,
     'pwd'    : pwd,
+    'mount'  : """/dev/ad0s4a on / (ufs, local)\r
+devfs on /dev (devfs, local)\r
+/dev/ad0s4d on /tmp (ufs, local, soft-updates)\r
+/dev/ad0s4e on /usr (ufs, local, soft-updates)\r
+/dev/ad0s1 on /mnt/linux (ext2fs, local)\r
+/dev/ad0s3 on /mnt/linux/home (ext2fs, local)\r
+""",
     'w'      : """22:53  up 4 mins, 2 users, load averages: 0,03 0,16 0,09\r
 USER             TTY      FROM              LOGIN@  IDLE WHAT\r
 root              v0       -                22:49       3 csh\r

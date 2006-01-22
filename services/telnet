@@ -12,7 +12,7 @@ def loguj(arg):
 
 
 from twisted.conch.telnet import TelnetTransport
-class MyTelnetTransport(TelnetTransport):      # po czym to cholerstwo ma dziedizczyc??
+class MyTelnetTransport(TelnetTransport):
     def connectionLost(self, reason):
         Transport.connectionLost(self, reason)
         os._exit(0);
